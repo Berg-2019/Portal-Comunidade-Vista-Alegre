@@ -15,13 +15,20 @@ import {
   Menu,
   X,
   Home,
+  Newspaper,
+  Calendar,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import AdminNewsManager from "@/components/admin/AdminNewsManager";
+import AdminCourtsManager from "@/components/admin/AdminCourtsManager";
+import AdminScheduleManager from "@/components/admin/AdminScheduleManager";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos";
 
 interface PackageItem {
   id: string;
@@ -44,7 +51,15 @@ const statusConfig = {
   DEVOLVIDO: { label: "Devolvido", icon: XCircle, class: "bg-destructive/10 text-destructive" },
 };
 
+const navItems = [
+  { id: "encomendas" as ActiveTab, label: "Encomendas", icon: Package },
+  { id: "noticias" as ActiveTab, label: "Notícias", icon: Newspaper },
+  { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
+  { id: "agendamentos" as ActiveTab, label: "Agendamentos Fixos", icon: Users },
+];
+
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("encomendas");
   const [packages, setPackages] = useState<PackageItem[]>(initialPackages);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -80,6 +95,21 @@ export default function AdminDashboard() {
     });
   };
 
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case "encomendas":
+        return "Gerenciar Encomendas";
+      case "noticias":
+        return "Gerenciar Notícias";
+      case "quadras":
+        return "Gerenciar Quadras";
+      case "agendamentos":
+        return "Agendamentos Fixos";
+      default:
+        return "Dashboard";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Sidebar Overlay */}
@@ -101,7 +131,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-heading font-bold">
-                GC
+                VA
               </div>
               <span className="font-heading font-semibold">Admin</span>
             </div>
@@ -116,10 +146,24 @@ export default function AdminDashboard() {
           </div>
 
           <nav className="space-y-2">
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/10 text-primary font-medium">
-              <Package className="h-5 w-5" />
-              Encomendas
-            </button>
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setSidebarOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors",
+                  activeTab === item.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </button>
+            ))}
           </nav>
         </div>
 
@@ -153,191 +197,207 @@ export default function AdminDashboard() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <h1 className="font-heading text-xl font-semibold">Gerenciar Encomendas</h1>
+              <h1 className="font-heading text-xl font-semibold">{getTabTitle()}</h1>
             </div>
-            <Button onClick={handleUpload}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload PDF
-            </Button>
+            {activeTab === "encomendas" && (
+              <Button onClick={handleUpload}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload PDF
+              </Button>
+            )}
           </div>
         </header>
 
         <div className="p-6">
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Package className="h-5 w-5 text-primary" />
+          {/* Encomendas Tab */}
+          {activeTab === "encomendas" && (
+            <>
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Package className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total</p>
+                      <p className="text-2xl font-bold">{stats.total}</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-warning/10">
+                      <Clock className="h-5 w-5 text-warning" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Aguardando</p>
+                      <p className="text-2xl font-bold">{stats.aguardando}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-success/10">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Entregues</p>
+                      <p className="text-2xl font-bold">{stats.entregue}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-destructive/10">
+                      <XCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Devolvidas</p>
+                      <p className="text-2xl font-bold">{stats.devolvido}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-warning/10">
-                  <Clock className="h-5 w-5 text-warning" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Aguardando</p>
-                  <p className="text-2xl font-bold">{stats.aguardando}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-success/10">
-                  <CheckCircle className="h-5 w-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Entregues</p>
-                  <p className="text-2xl font-bold">{stats.entregue}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-destructive/10">
-                  <XCircle className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Devolvidas</p>
-                  <p className="text-2xl font-bold">{stats.devolvido}</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Search */}
-          <div className="bg-card rounded-xl p-4 mb-6 shadow-sm border border-border">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou código..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+              {/* Search */}
+              <div className="bg-card rounded-xl p-4 mb-6 shadow-sm border border-border">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome ou código..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
 
-          {/* Package List */}
-          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                      Destinatário
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                      Código
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                      Chegada
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                      Prazo
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-muted-foreground">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredPackages.map((pkg) => {
-                    const config = statusConfig[pkg.status];
-                    const Icon = config.icon;
-
-                    return (
-                      <tr key={pkg.id} className="hover:bg-muted/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-medium">{pkg.nome}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.codigo}</code>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {pkg.dataChegada}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {pkg.prazoRetirada}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>
-                            <Icon className="h-3.5 w-3.5" />
-                            {config.label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-end gap-2">
-                            {pkg.status === "AGUARDANDO" && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-success hover:text-success"
-                                  onClick={() => handleStatusChange(pkg.id, "ENTREGUE")}
-                                >
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Entregar
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => handleStatusChange(pkg.id, "DEVOLVIDO")}
-                                >
-                                  <RotateCcw className="h-4 w-4 mr-1" />
-                                  Devolver
-                                </Button>
-                              </>
-                            )}
-                            {pkg.status !== "AGUARDANDO" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleStatusChange(pkg.id, "AGUARDANDO")}
-                              >
-                                <RotateCcw className="h-4 w-4 mr-1" />
-                                Restaurar
-                              </Button>
-                            )}
-                          </div>
-                        </td>
+              {/* Package List */}
+              <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
+                          Destinatário
+                        </th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
+                          Código
+                        </th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
+                          Chegada
+                        </th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
+                          Prazo
+                        </th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-right text-sm font-semibold text-muted-foreground">
+                          Ações
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredPackages.map((pkg) => {
+                        const config = statusConfig[pkg.status];
+                        const Icon = config.icon;
 
-            {filteredPackages.length === 0 && (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhuma encomenda encontrada</p>
-              </div>
-            )}
-          </div>
+                        return (
+                          <tr key={pkg.id} className="hover:bg-muted/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <p className="font-medium">{pkg.nome}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.codigo}</code>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-muted-foreground">
+                              {pkg.dataChegada}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-muted-foreground">
+                              {pkg.prazoRetirada}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>
+                                <Icon className="h-3.5 w-3.5" />
+                                {config.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                {pkg.status === "AGUARDANDO" && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-success hover:text-success"
+                                      onClick={() => handleStatusChange(pkg.id, "ENTREGUE")}
+                                    >
+                                      <Check className="h-4 w-4 mr-1" />
+                                      Entregar
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={() => handleStatusChange(pkg.id, "DEVOLVIDO")}
+                                    >
+                                      <RotateCcw className="h-4 w-4 mr-1" />
+                                      Devolver
+                                    </Button>
+                                  </>
+                                )}
+                                {pkg.status !== "AGUARDANDO" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleStatusChange(pkg.id, "AGUARDANDO")}
+                                  >
+                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    Restaurar
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-          {/* Upload Info */}
-          <div className="mt-8 bg-info/10 border border-info/20 rounded-xl p-6">
-            <div className="flex items-start gap-4">
-              <FileText className="h-6 w-6 text-info flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-heading font-semibold text-info mb-2">Upload de Listas PDF</h3>
-                <p className="text-sm text-muted-foreground">
-                  Faça upload das listas de encomendas em PDF recebidas dos Correios. O sistema irá extrair automaticamente os dados usando OCR para facilitar o gerenciamento.
-                </p>
+                {filteredPackages.length === 0 && (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhuma encomenda encontrada</p>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
+
+              {/* Upload Info */}
+              <div className="mt-8 bg-info/10 border border-info/20 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <FileText className="h-6 w-6 text-info flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-heading font-semibold text-info mb-2">Upload de Listas PDF</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Faça upload das listas de encomendas em PDF recebidas dos Correios. O sistema irá extrair automaticamente os dados usando OCR para facilitar o gerenciamento.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Notícias Tab */}
+          {activeTab === "noticias" && <AdminNewsManager />}
+
+          {/* Quadras Tab */}
+          {activeTab === "quadras" && <AdminCourtsManager />}
+
+          {/* Agendamentos Tab */}
+          {activeTab === "agendamentos" && <AdminScheduleManager />}
         </div>
       </main>
     </div>

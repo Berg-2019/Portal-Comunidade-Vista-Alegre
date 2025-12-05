@@ -35,6 +35,8 @@ export const upload = multer({
   },
 });
 
+export const uploadSingle = (fieldName: string) => upload.single(fieldName);
+
 export const uploadErrorHandler = (err: any, req: any, res: any, next: any) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {

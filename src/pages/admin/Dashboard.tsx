@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Settings,
   Shield,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +32,10 @@ import AdminScheduleManager from "@/components/admin/AdminScheduleManager";
 import AdminOccurrencesManager from "@/components/admin/AdminOccurrencesManager";
 import AdminPageManager from "@/components/admin/AdminPageManager";
 import AdminUsersManager from "@/components/admin/AdminUsersManager";
+import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "pagina" | "usuarios";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "pagina" | "usuarios";
 
 interface PackageItem {
   id: string;
@@ -60,6 +62,7 @@ const navItems = [
   { id: "encomendas" as ActiveTab, label: "Encomendas", icon: Package },
   { id: "noticias" as ActiveTab, label: "Notícias", icon: Newspaper },
   { id: "ocorrencias" as ActiveTab, label: "Ocorrências", icon: AlertCircle },
+  { id: "comercios" as ActiveTab, label: "Comércios", icon: Store },
   { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
   { id: "agendamentos" as ActiveTab, label: "Agendamentos", icon: Users },
   { id: "pagina" as ActiveTab, label: "Página", icon: Settings, divider: true },
@@ -115,6 +118,8 @@ export default function AdminDashboard() {
         return "Agendamentos Fixos";
       case "ocorrencias":
         return "Gerenciar Ocorrências";
+      case "comercios":
+        return "Gerenciar Comércios";
       case "pagina":
         return "Configurações da Página";
       case "usuarios":
@@ -422,6 +427,9 @@ export default function AdminDashboard() {
 
           {/* Página Tab */}
           {activeTab === "pagina" && <AdminPageManager />}
+
+          {/* Comércios Tab */}
+          {activeTab === "comercios" && <AdminBusinessManager />}
 
           {/* Usuários Tab */}
           {activeTab === "usuarios" && <AdminUsersManager />}

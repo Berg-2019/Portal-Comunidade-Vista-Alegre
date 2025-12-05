@@ -1,33 +1,74 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
-  Store, Search, MapPin, Phone, Clock, MessageCircle, Plus,
+  Store, Search, MapPin, Phone, Clock, MessageCircle, Plus, Loader2,
   ShoppingCart, UtensilsCrossed, Wrench, Pill, Scissors, Briefcase
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { businesses, businessCategories } from "@/data/mockData";
+import { api } from "@/services/api";
+
+interface Business {
+  id: number;
+  name: string;
+  description: string;
+  category_id: number;
+  category_name?: string;
+  category_icon?: string;
+  address: string;
+  phone: string;
+  whatsapp: string;
+  opening_hours?: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+}
 
 const iconMap: Record<string, React.ElementType> = {
-  ShoppingCart,
-  UtensilsCrossed,
-  Wrench,
-  Pill,
-  Scissors,
-  Briefcase,
+  'shopping-bag': ShoppingCart,
+  'utensils': UtensilsCrossed,
+  'wrench': Wrench,
+  'heart': Pill,
+  'scissors': Scissors,
+  'book': Store,
+  'car': Store,
+  'more-horizontal': Briefcase,
 };
 
 export default function Comercios() {
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
-  const approvedBusinesses = businesses.filter(b => b.approved);
-  
-  const filteredBusinesses = approvedBusinesses.filter(item => {
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [businessesData, categoriesData] = await Promise.all([
+          api.getBusinesses(),
+          api.getBusinessCategories(),
+        ]);
+        setBusinesses(businessesData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const filteredBusinesses = businesses.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -75,7 +116,7 @@ export default function Comercios() {
             >
               Todos
             </Button>
-            {businessCategories.map(category => {
+            {categories.map(category => {
               const Icon = iconMap[category.icon] || Store;
               return (
                 <Button
@@ -92,8 +133,12 @@ export default function Comercios() {
           </div>
         </div>
 
-        {/* Businesses Grid */}
-        {filteredBusinesses.length === 0 ? (
+        {/* Loading */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <Store className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhum comércio encontrado.</p>
@@ -101,7 +146,7 @@ export default function Comercios() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {filteredBusinesses.map((business, index) => {
-              const category = businessCategories.find(c => c.id === business.categoryId);
+              const category = categories.find(c => c.id === business.category_id);
               const Icon = category ? (iconMap[category.icon] || Store) : Store;
               
               return (
@@ -135,10 +180,10 @@ export default function Comercios() {
                           <span>{business.address}</span>
                         </div>
                         
-                        {business.openingHours && (
+                        {business.opening_hours && (
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Clock className="h-4 w-4 flex-shrink-0" />
-                            <span>{business.openingHours}</span>
+                            <span>{business.opening_hours}</span>
                           </div>
                         )}
                         
@@ -158,7 +203,7 @@ export default function Comercios() {
                               href={`https://wa.me/${business.whatsapp}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-success hover:underline"
+                              className="inline-flex items-center gap-1 text-green-600 hover:underline"
                             >
                               <MessageCircle className="h-4 w-4" />
                               WhatsApp

@@ -499,6 +499,119 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Schedule methods (fixed schedules for schools/projects)
+  async getSchedules(params?: { court_id?: string; day_of_week?: number; active?: boolean }) {
+    const queryParams = new URLSearchParams();
+    if (params?.court_id) queryParams.append('court_id', params.court_id);
+    if (params?.day_of_week !== undefined) queryParams.append('day_of_week', String(params.day_of_week));
+    if (params?.active !== undefined) queryParams.append('active', String(params.active));
+    const queryString = queryParams.toString();
+    return this.request<any[]>(`/api/schedules${queryString ? `?${queryString}` : ''}`, {
+      authenticated: false,
+    });
+  }
+
+  async createSchedule(data: {
+    court_id: number;
+    project_name: string;
+    project_type: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    responsible: string;
+    phone?: string;
+  }) {
+    return this.request<{ success: boolean; schedule: any }>('/api/schedules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateSchedule(id: string, data: any) {
+    return this.request<{ success: boolean; schedule: any }>(`/api/schedules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleSchedule(id: string) {
+    return this.request<{ success: boolean; schedule: any }>(`/api/schedules/${id}/toggle`, {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteSchedule(id: string) {
+    return this.request<{ success: boolean }>(`/api/schedules/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Reservation methods (individual court bookings)
+  async getReservations(params?: { court_id?: string; status?: string; date_from?: string; date_to?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.court_id) queryParams.append('court_id', params.court_id);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.date_from) queryParams.append('date_from', params.date_from);
+    if (params?.date_to) queryParams.append('date_to', params.date_to);
+    const queryString = queryParams.toString();
+    return this.request<any[]>(`/api/reservations${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getReservationStats() {
+    return this.request<{
+      total: string;
+      confirmed: string;
+      cancelled: string;
+      completed: string;
+      today: string;
+      upcoming: string;
+    }>('/api/reservations/stats');
+  }
+
+  async checkAvailability(courtId: string, date: string) {
+    return this.request<{ start_time: string; end_time: string }[]>(`/api/reservations/availability/${courtId}/${date}`, {
+      authenticated: false,
+    });
+  }
+
+  async createReservation(data: {
+    court_id: number;
+    slot_id?: number;
+    user_name: string;
+    user_phone: string;
+    reservation_date: string;
+    start_time: string;
+    end_time: string;
+    source?: string;
+    notes?: string;
+  }) {
+    return this.request<{ success: boolean; reservation: any }>('/api/reservations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      authenticated: false,
+    });
+  }
+
+  async updateReservation(id: string, data: { status?: string; notes?: string }) {
+    return this.request<{ success: boolean; reservation: any }>(`/api/reservations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelReservation(id: string) {
+    return this.request<{ success: boolean; reservation: any }>(`/api/reservations/${id}/cancel`, {
+      method: 'PUT',
+      authenticated: false,
+    });
+  }
+
+  async deleteReservation(id: string) {
+    return this.request<{ success: boolean }>(`/api/reservations/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

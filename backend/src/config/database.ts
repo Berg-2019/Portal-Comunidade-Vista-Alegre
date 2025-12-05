@@ -285,6 +285,39 @@ export async function initDatabase() {
         ('Comércio Local', 'Divulgação de produtos e serviços locais', 'comercio', 'https://chat.whatsapp.com/exemplo2', 'shopping-bag', 2)
       ) AS v(name, description, category, invite_link, icon, order_index)
       WHERE NOT EXISTS (SELECT 1 FROM whatsapp_groups LIMIT 1);
+
+      -- Fixed schedules table for schools and social projects
+      CREATE TABLE IF NOT EXISTS fixed_schedules (
+        id SERIAL PRIMARY KEY,
+        court_id INTEGER REFERENCES courts(id) ON DELETE CASCADE,
+        project_name VARCHAR(255) NOT NULL,
+        project_type VARCHAR(50) NOT NULL,
+        day_of_week INTEGER NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        responsible VARCHAR(255) NOT NULL,
+        phone VARCHAR(20),
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Court reservations table for individual bookings
+      CREATE TABLE IF NOT EXISTS court_reservations (
+        id SERIAL PRIMARY KEY,
+        court_id INTEGER REFERENCES courts(id) ON DELETE CASCADE,
+        slot_id INTEGER REFERENCES court_time_slots(id),
+        user_name VARCHAR(255) NOT NULL,
+        user_phone VARCHAR(20) NOT NULL,
+        reservation_date DATE NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        status VARCHAR(20) DEFAULT 'confirmed',
+        source VARCHAR(20) DEFAULT 'whatsapp',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
     `);
 
     console.log('✅ Database initialized successfully');

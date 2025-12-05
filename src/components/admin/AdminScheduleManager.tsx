@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Pencil,
@@ -8,6 +8,7 @@ import {
   Phone,
   CheckCircle,
   XCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,28 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { FixedSchedule, Court, CourtType } from "@/types";
+import { api } from "@/services/api";
+
+interface Schedule {
+  id: number;
+  court_id: number;
+  court_name?: string;
+  project_name: string;
+  project_type: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  responsible: string;
+  phone?: string;
+  active: boolean;
+  created_at: string;
+}
+
+interface Court {
+  id: number;
+  name: string;
+  type: string;
+}
 
 const DAYS_OF_WEEK = [
   "Domingo",
@@ -47,79 +69,59 @@ const PROJECT_TYPES = [
   { value: "outro", label: "Outro" },
 ] as const;
 
-const initialCourts: Court[] = [
-  { id: "1", name: "Quadra Poliesportiva Central", type: "futsal" as CourtType, available: true },
-  { id: "2", name: "Quadra de Vôlei", type: "volei" as CourtType, available: true },
-];
-
-const initialSchedules: FixedSchedule[] = [
-  {
-    id: "1",
-    courtId: "1",
-    projectName: "Escolinha de Futsal Sub-12",
-    projectType: "escola",
-    dayOfWeek: 2,
-    startTime: "14:00",
-    endTime: "16:00",
-    responsible: "Prof. Carlos Silva",
-    phone: "(69) 99999-0001",
-    active: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    courtId: "1",
-    projectName: "Projeto Esporte para Todos",
-    projectType: "projeto_social",
-    dayOfWeek: 4,
-    startTime: "08:00",
-    endTime: "10:00",
-    responsible: "Maria Santos",
-    phone: "(69) 99999-0002",
-    active: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    courtId: "2",
-    projectName: "Treino Vôlei Feminino",
-    projectType: "treino",
-    dayOfWeek: 3,
-    startTime: "19:00",
-    endTime: "21:00",
-    responsible: "Técnica Ana Paula",
-    phone: "(69) 99999-0003",
-    active: true,
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export default function AdminScheduleManager() {
-  const [courts] = useState<Court[]>(initialCourts);
-  const [schedules, setSchedules] = useState<FixedSchedule[]>(initialSchedules);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<FixedSchedule | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    courtId: "",
-    projectName: "",
-    projectType: "escola" as FixedSchedule["projectType"],
-    dayOfWeek: 1,
-    startTime: "",
-    endTime: "",
+    court_id: "",
+    project_name: "",
+    project_type: "escola",
+    day_of_week: 1,
+    start_time: "",
+    end_time: "",
     responsible: "",
     phone: "",
   });
 
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [courtsData, schedulesData] = await Promise.all([
+        api.getCourts(),
+        api.getSchedules(),
+      ]);
+      setCourts(courtsData);
+      setSchedules(schedulesData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
-      courtId: courts[0]?.id || "",
-      projectName: "",
-      projectType: "escola",
-      dayOfWeek: 1,
-      startTime: "",
-      endTime: "",
+      court_id: courts[0]?.id?.toString() || "",
+      project_name: "",
+      project_type: "escola",
+      day_of_week: 1,
+      start_time: "",
+      end_time: "",
       responsible: "",
       phone: "",
     });
@@ -131,23 +133,23 @@ export default function AdminScheduleManager() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (schedule: FixedSchedule) => {
+  const openEditModal = (schedule: Schedule) => {
     setEditingSchedule(schedule);
     setFormData({
-      courtId: schedule.courtId,
-      projectName: schedule.projectName,
-      projectType: schedule.projectType,
-      dayOfWeek: schedule.dayOfWeek,
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
+      court_id: schedule.court_id.toString(),
+      project_name: schedule.project_name,
+      project_type: schedule.project_type,
+      day_of_week: schedule.day_of_week,
+      start_time: schedule.start_time.slice(0, 5),
+      end_time: schedule.end_time.slice(0, 5),
       responsible: schedule.responsible,
       phone: schedule.phone || "",
     });
     setIsModalOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.courtId || !formData.projectName || !formData.startTime || !formData.endTime || !formData.responsible) {
+  const handleSubmit = async () => {
+    if (!formData.court_id || !formData.project_name || !formData.start_time || !formData.end_time || !formData.responsible) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios.",
@@ -156,57 +158,97 @@ export default function AdminScheduleManager() {
       return;
     }
 
-    if (editingSchedule) {
+    setIsSubmitting(true);
+    try {
+      const data = {
+        court_id: parseInt(formData.court_id),
+        project_name: formData.project_name,
+        project_type: formData.project_type,
+        day_of_week: formData.day_of_week,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        responsible: formData.responsible,
+        phone: formData.phone || undefined,
+      };
+
+      if (editingSchedule) {
+        await api.updateSchedule(editingSchedule.id.toString(), data);
+        toast({ title: "Agendamento atualizado!" });
+      } else {
+        await api.createSchedule(data);
+        toast({ title: "Agendamento criado!" });
+      }
+
+      setIsModalOpen(false);
+      resetForm();
+      loadData();
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar agendamento",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await api.deleteSchedule(id.toString());
+      setSchedules((prev) => prev.filter((item) => item.id !== id));
+      toast({ title: "Agendamento excluído!" });
+    } catch (error) {
+      console.error("Error deleting schedule:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir agendamento",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleActive = async (id: number) => {
+    try {
+      const result = await api.toggleSchedule(id.toString());
       setSchedules((prev) =>
         prev.map((item) =>
-          item.id === editingSchedule.id
-            ? { ...item, ...formData }
-            : item
+          item.id === id ? { ...item, active: result.schedule.active } : item
         )
       );
-      toast({ title: "Agendamento atualizado!" });
-    } else {
-      const newSchedule: FixedSchedule = {
-        id: Date.now().toString(),
-        ...formData,
-        active: true,
-        createdAt: new Date().toISOString(),
-      };
-      setSchedules((prev) => [...prev, newSchedule]);
-      toast({ title: "Agendamento criado!" });
+      toast({ title: "Status alterado!" });
+    } catch (error) {
+      console.error("Error toggling schedule:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar status",
+        variant: "destructive",
+      });
     }
-
-    setIsModalOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    setSchedules((prev) => prev.filter((item) => item.id !== id));
-    toast({ title: "Agendamento excluído!" });
-  };
-
-  const toggleActive = (id: string) => {
-    setSchedules((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, active: !item.active } : item
-      )
-    );
-    toast({ title: "Status alterado!" });
-  };
-
-  const getCourtName = (courtId: string) => {
+  const getCourtName = (courtId: number) => {
     return courts.find((c) => c.id === courtId)?.name || "Quadra não encontrada";
   };
 
-  const getProjectTypeLabel = (type: FixedSchedule["projectType"]) => {
+  const getProjectTypeLabel = (type: string) => {
     return PROJECT_TYPES.find((t) => t.value === type)?.label || type;
   };
 
   const groupedByDay = DAYS_OF_WEEK.map((day, index) => ({
     day,
     dayIndex: index,
-    schedules: schedules.filter((s) => s.dayOfWeek === index),
+    schedules: schedules.filter((s) => s.day_of_week === index),
   })).filter((group) => group.schedules.length > 0);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -238,8 +280,8 @@ export default function AdminScheduleManager() {
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10">
-              <CheckCircle className="h-5 w-5 text-success" />
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <CheckCircle className="h-5 w-5 text-green-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Ativos</p>
@@ -251,26 +293,26 @@ export default function AdminScheduleManager() {
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10">
-              <Users className="h-5 w-5 text-info" />
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <Users className="h-5 w-5 text-blue-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Escolinhas</p>
               <p className="text-2xl font-bold">
-                {schedules.filter((s) => s.projectType === "escola").length}
+                {schedules.filter((s) => s.project_type === "escola").length}
               </p>
             </div>
           </div>
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10">
-              <Users className="h-5 w-5 text-warning" />
+            <div className="p-2 rounded-lg bg-orange-500/10">
+              <Users className="h-5 w-5 text-orange-500" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Projetos</p>
               <p className="text-2xl font-bold">
-                {schedules.filter((s) => s.projectType === "projeto_social").length}
+                {schedules.filter((s) => s.project_type === "projeto_social").length}
               </p>
             </div>
           </div>
@@ -310,25 +352,25 @@ export default function AdminScheduleManager() {
                             className={cn(
                               "px-2 py-0.5 rounded-full text-xs font-medium",
                               schedule.active
-                                ? "bg-success/10 text-success"
+                                ? "bg-green-500/10 text-green-500"
                                 : "bg-muted text-muted-foreground"
                             )}
                           >
                             {schedule.active ? "Ativo" : "Inativo"}
                           </span>
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {getProjectTypeLabel(schedule.projectType)}
+                            {getProjectTypeLabel(schedule.project_type)}
                           </span>
                         </div>
-                        <h4 className="font-medium text-lg">{schedule.projectName}</h4>
+                        <h4 className="font-medium text-lg">{schedule.project_name}</h4>
                         <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                           <p className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            {getCourtName(schedule.courtId)}
+                            {schedule.court_name || getCourtName(schedule.court_id)}
                           </p>
                           <p className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            {schedule.startTime} - {schedule.endTime}
+                            {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)}
                           </p>
                           <p className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
@@ -352,7 +394,7 @@ export default function AdminScheduleManager() {
                           {schedule.active ? (
                             <XCircle className="h-4 w-4 text-destructive" />
                           ) : (
-                            <CheckCircle className="h-4 w-4 text-success" />
+                            <CheckCircle className="h-4 w-4 text-green-500" />
                           )}
                         </Button>
                         <Button
@@ -391,12 +433,12 @@ export default function AdminScheduleManager() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="projectName">Nome do Projeto/Escolinha *</Label>
+              <Label htmlFor="project_name">Nome do Projeto/Escolinha *</Label>
               <Input
-                id="projectName"
-                value={formData.projectName}
+                id="project_name"
+                value={formData.project_name}
                 onChange={(e) =>
-                  setFormData({ ...formData, projectName: e.target.value })
+                  setFormData({ ...formData, project_name: e.target.value })
                 }
                 placeholder="Ex: Escolinha de Futsal Sub-12"
               />
@@ -406,9 +448,9 @@ export default function AdminScheduleManager() {
               <div className="space-y-2">
                 <Label>Tipo *</Label>
                 <Select
-                  value={formData.projectType}
-                  onValueChange={(value: FixedSchedule["projectType"]) =>
-                    setFormData({ ...formData, projectType: value })
+                  value={formData.project_type}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, project_type: value })
                   }
                 >
                   <SelectTrigger>
@@ -427,9 +469,9 @@ export default function AdminScheduleManager() {
               <div className="space-y-2">
                 <Label>Quadra *</Label>
                 <Select
-                  value={formData.courtId}
+                  value={formData.court_id}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, courtId: value })
+                    setFormData({ ...formData, court_id: value })
                   }
                 >
                   <SelectTrigger>
@@ -437,7 +479,7 @@ export default function AdminScheduleManager() {
                   </SelectTrigger>
                   <SelectContent>
                     {courts.map((court) => (
-                      <SelectItem key={court.id} value={court.id}>
+                      <SelectItem key={court.id} value={court.id.toString()}>
                         {court.name}
                       </SelectItem>
                     ))}
@@ -449,9 +491,9 @@ export default function AdminScheduleManager() {
             <div className="space-y-2">
               <Label>Dia da Semana *</Label>
               <Select
-                value={formData.dayOfWeek.toString()}
+                value={formData.day_of_week.toString()}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, dayOfWeek: parseInt(value) })
+                  setFormData({ ...formData, day_of_week: parseInt(value) })
                 }
               >
                 <SelectTrigger>
@@ -469,24 +511,24 @@ export default function AdminScheduleManager() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startTime">Horário Início *</Label>
+                <Label htmlFor="start_time">Horário Início *</Label>
                 <Input
-                  id="startTime"
+                  id="start_time"
                   type="time"
-                  value={formData.startTime}
+                  value={formData.start_time}
                   onChange={(e) =>
-                    setFormData({ ...formData, startTime: e.target.value })
+                    setFormData({ ...formData, start_time: e.target.value })
                   }
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endTime">Horário Fim *</Label>
+                <Label htmlFor="end_time">Horário Fim *</Label>
                 <Input
-                  id="endTime"
+                  id="end_time"
                   type="time"
-                  value={formData.endTime}
+                  value={formData.end_time}
                   onChange={(e) =>
-                    setFormData({ ...formData, endTime: e.target.value })
+                    setFormData({ ...formData, end_time: e.target.value })
                   }
                 />
               </div>
@@ -512,7 +554,7 @@ export default function AdminScheduleManager() {
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                placeholder="(69) 99999-0000"
+                placeholder="(99) 99999-9999"
               />
             </div>
           </div>
@@ -521,7 +563,8 @@ export default function AdminScheduleManager() {
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingSchedule ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>

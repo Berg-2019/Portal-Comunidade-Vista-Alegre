@@ -99,6 +99,74 @@ export async function initDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Packages table for mail management
+      CREATE TABLE IF NOT EXISTS packages (
+        id SERIAL PRIMARY KEY,
+        recipient_name VARCHAR(255) NOT NULL,
+        tracking_code VARCHAR(50) UNIQUE NOT NULL,
+        status VARCHAR(20) DEFAULT 'aguardando',
+        arrival_date DATE NOT NULL,
+        pickup_deadline DATE NOT NULL,
+        notes TEXT,
+        pdf_source VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Courts table for sports court management
+      CREATE TABLE IF NOT EXISTS courts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        image_url VARCHAR(500),
+        available BOOLEAN DEFAULT TRUE,
+        maintenance_mode BOOLEAN DEFAULT FALSE,
+        maintenance_reason TEXT,
+        maintenance_start DATE,
+        maintenance_end DATE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Court time slots
+      CREATE TABLE IF NOT EXISTS court_time_slots (
+        id SERIAL PRIMARY KEY,
+        court_id INTEGER REFERENCES courts(id) ON DELETE CASCADE,
+        day_of_week INTEGER NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        available BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Court maintenance periods
+      CREATE TABLE IF NOT EXISTS court_maintenance_periods (
+        id SERIAL PRIMARY KEY,
+        court_id INTEGER REFERENCES courts(id) ON DELETE CASCADE,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        start_time TIME,
+        end_time TIME,
+        reason VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- WhatsApp groups for community
+      CREATE TABLE IF NOT EXISTS whatsapp_groups (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100) NOT NULL,
+        invite_link VARCHAR(500) NOT NULL,
+        icon VARCHAR(100),
+        member_count INTEGER,
+        is_active BOOLEAN DEFAULT TRUE,
+        order_index INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Insert default news categories if not exist
       INSERT INTO news_categories (name, slug)
       SELECT * FROM (VALUES 
@@ -136,6 +204,22 @@ export async function initDatabase() {
         ('primaryColor', '#166534')
       ) AS v(key, value)
       WHERE NOT EXISTS (SELECT 1 FROM site_settings LIMIT 1);
+
+      -- Insert default courts if not exist
+      INSERT INTO courts (name, type, description)
+      SELECT * FROM (VALUES 
+        ('Quadra Poliesportiva Central', 'futsal', 'Quadra coberta para futsal e outros esportes'),
+        ('Quadra de Vôlei', 'volei', 'Quadra para vôlei de areia')
+      ) AS v(name, type, description)
+      WHERE NOT EXISTS (SELECT 1 FROM courts LIMIT 1);
+
+      -- Insert default whatsapp group categories
+      INSERT INTO whatsapp_groups (name, description, category, invite_link, icon, order_index)
+      SELECT * FROM (VALUES 
+        ('Comunidade Vista Alegre', 'Grupo principal da comunidade para avisos gerais', 'geral', 'https://chat.whatsapp.com/exemplo1', 'users', 1),
+        ('Comércio Local', 'Divulgação de produtos e serviços locais', 'comercio', 'https://chat.whatsapp.com/exemplo2', 'shopping-bag', 2)
+      ) AS v(name, description, category, invite_link, icon, order_index)
+      WHERE NOT EXISTS (SELECT 1 FROM whatsapp_groups LIMIT 1);
     `);
 
     console.log('✅ Database initialized successfully');

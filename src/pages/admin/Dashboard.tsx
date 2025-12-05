@@ -33,9 +33,10 @@ import AdminOccurrencesManager from "@/components/admin/AdminOccurrencesManager"
 import AdminPageManager from "@/components/admin/AdminPageManager";
 import AdminUsersManager from "@/components/admin/AdminUsersManager";
 import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
+import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "pagina" | "usuarios";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "pagina" | "usuarios";
 
 interface PackageItem {
   id: string;
@@ -65,6 +66,7 @@ const navItems = [
   { id: "comercios" as ActiveTab, label: "Comércios", icon: Store },
   { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
   { id: "agendamentos" as ActiveTab, label: "Agendamentos", icon: Users },
+  { id: "whatsapp" as ActiveTab, label: "WhatsApp", icon: Users },
   { id: "pagina" as ActiveTab, label: "Página", icon: Settings, divider: true },
   { id: "usuarios" as ActiveTab, label: "Usuários", icon: Shield },
 ];
@@ -120,6 +122,8 @@ export default function AdminDashboard() {
         return "Gerenciar Ocorrências";
       case "comercios":
         return "Gerenciar Comércios";
+      case "whatsapp":
+        return "Grupos WhatsApp";
       case "pagina":
         return "Configurações da Página";
       case "usuarios":

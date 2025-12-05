@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Pencil,
@@ -9,10 +9,9 @@ import {
   StarOff,
   Check,
   X,
-  MapPin,
-  MessageCircle,
-  Instagram,
-  ExternalLink,
+  Loader2,
+  AlertCircle,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,70 +33,117 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Business, BusinessCategory } from "@/types";
-import { businesses as initialBusinesses, businessCategories } from "@/data/mockData";
+import { api } from "@/services/api";
 import ImageUpload from "./ImageUpload";
 
-interface ExtendedBusiness extends Business {
-  imageUrl?: string;
-  instagramUrl?: string;
-  websiteUrl?: string;
+interface Business {
+  id: string;
+  name: string;
+  description: string;
+  category_id: string;
+  address?: string;
   location?: string;
-  isSponsor?: boolean;
+  phone?: string;
+  whatsapp?: string;
+  instagram_url?: string;
+  website_url?: string;
+  opening_hours?: string;
+  image_url?: string;
+  owner_name?: string;
+  owner_phone?: string;
+  is_sponsor: boolean;
+  status: "pending" | "approved" | "rejected";
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 export default function AdminBusinessManager() {
-  const [businessList, setBusinessList] = useState<ExtendedBusiness[]>(initialBusinesses as ExtendedBusiness[]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [filterSponsor, setFilterSponsor] = useState<"all" | "sponsors" | "regular">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingBusiness, setEditingBusiness] = useState<ExtendedBusiness | null>(null);
+  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    categoryId: "",
+    category_id: "",
     address: "",
     phone: "",
     whatsapp: "",
-    instagramUrl: "",
-    websiteUrl: "",
+    instagram_url: "",
+    website_url: "",
     location: "",
-    openingHours: "",
-    imageUrl: "",
-    isSponsor: false,
-    approved: false,
+    opening_hours: "",
+    image_url: "",
+    is_sponsor: false,
   });
 
-  const filteredBusinesses = businessList.filter((item) => {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [businessData, categoryData] = await Promise.all([
+        api.getAllBusinesses(),
+        api.getBusinessCategories(),
+      ]);
+      setBusinesses(businessData);
+      setCategories(categoryData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pendingCount = businesses.filter(b => b.status === "pending").length;
+
+  const filteredBusinesses = businesses.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase());
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesFilter =
+    const matchesStatus =
+      filterStatus === "all" || item.status === filterStatus;
+    
+    const matchesSponsor =
       filterSponsor === "all" ||
-      (filterSponsor === "sponsors" && item.isSponsor) ||
-      (filterSponsor === "regular" && !item.isSponsor);
+      (filterSponsor === "sponsors" && item.is_sponsor) ||
+      (filterSponsor === "regular" && !item.is_sponsor);
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesStatus && matchesSponsor;
   });
 
   const resetForm = () => {
     setFormData({
       name: "",
       description: "",
-      categoryId: "",
+      category_id: "",
       address: "",
       phone: "",
       whatsapp: "",
-      instagramUrl: "",
-      websiteUrl: "",
+      instagram_url: "",
+      website_url: "",
       location: "",
-      openingHours: "",
-      imageUrl: "",
-      isSponsor: false,
-      approved: false,
+      opening_hours: "",
+      image_url: "",
+      is_sponsor: false,
     });
     setEditingBusiness(null);
   };
@@ -107,28 +153,27 @@ export default function AdminBusinessManager() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (business: ExtendedBusiness) => {
+  const openEditModal = (business: Business) => {
     setEditingBusiness(business);
     setFormData({
       name: business.name,
-      description: business.description,
-      categoryId: business.categoryId,
+      description: business.description || "",
+      category_id: business.category_id?.toString() || "",
       address: business.address || "",
       phone: business.phone || "",
       whatsapp: business.whatsapp || "",
-      instagramUrl: business.instagramUrl || "",
-      websiteUrl: business.websiteUrl || "",
+      instagram_url: business.instagram_url || "",
+      website_url: business.website_url || "",
       location: business.location || "",
-      openingHours: business.openingHours || "",
-      imageUrl: business.imageUrl || "",
-      isSponsor: business.isSponsor || false,
-      approved: business.approved,
+      opening_hours: business.opening_hours || "",
+      image_url: business.image_url || "",
+      is_sponsor: business.is_sponsor,
     });
     setIsModalOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.description || !formData.categoryId) {
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.description || !formData.category_id) {
       toast({
         title: "Erro",
         description: "Preencha os campos obrigatórios.",
@@ -137,63 +182,141 @@ export default function AdminBusinessManager() {
       return;
     }
 
-    if (editingBusiness) {
-      setBusinessList((prev) =>
-        prev.map((item) =>
-          item.id === editingBusiness.id
-            ? {
-                ...item,
-                ...formData,
-                updatedAt: new Date().toISOString(),
-              }
-            : item
-        )
-      );
-      toast({ title: "Comércio atualizado com sucesso!" });
-    } else {
-      const newBusiness: ExtendedBusiness = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setBusinessList((prev) => [newBusiness, ...prev]);
-      toast({ title: "Comércio cadastrado com sucesso!" });
+    setSaving(true);
+    try {
+      if (editingBusiness) {
+        await api.updateBusiness(editingBusiness.id, {
+          name: formData.name,
+          description: formData.description,
+          category_id: formData.category_id,
+          address: formData.address,
+          phone: formData.phone,
+          whatsapp: formData.whatsapp,
+          instagram_url: formData.instagram_url,
+          website_url: formData.website_url,
+          location: formData.location,
+          opening_hours: formData.opening_hours,
+          image_url: formData.image_url,
+          is_sponsor: formData.is_sponsor,
+        });
+        toast({ title: "Comércio atualizado com sucesso!" });
+      }
+      
+      setIsModalOpen(false);
+      resetForm();
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o comércio.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
-
-    setIsModalOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    setBusinessList((prev) => prev.filter((item) => item.id !== id));
-    toast({ title: "Comércio excluído com sucesso!" });
+  const handleApprove = async (id: string) => {
+    try {
+      await api.approveBusiness(id);
+      toast({ title: "Comércio aprovado!" });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível aprovar o comércio.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleApproved = (id: string) => {
-    setBusinessList((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, approved: !item.approved } : item
-      )
-    );
-    toast({ title: "Status de aprovação alterado!" });
+  const handleReject = async (id: string) => {
+    try {
+      await api.rejectBusiness(id);
+      toast({ title: "Comércio rejeitado!" });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível rejeitar o comércio.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleSponsor = (id: string) => {
-    setBusinessList((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isSponsor: !item.isSponsor } : item
-      )
-    );
-    toast({ title: "Status de patrocinador alterado!" });
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este comércio?")) return;
+
+    try {
+      await api.deleteBusiness(id);
+      toast({ title: "Comércio excluído com sucesso!" });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o comércio.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleSponsor = async (business: Business) => {
+    try {
+      await api.updateBusiness(business.id, { is_sponsor: !business.is_sponsor });
+      toast({ title: business.is_sponsor ? "Removido dos apoiadores!" : "Adicionado aos apoiadores!" });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o status.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getCategoryName = (categoryId: string) => {
-    return businessCategories.find((c) => c.id === categoryId)?.name || "Sem categoria";
+    return categories.find((c) => c.id.toString() === categoryId?.toString())?.name || "Sem categoria";
   };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "approved":
+        return { label: "Aprovado", class: "bg-success/10 text-success" };
+      case "rejected":
+        return { label: "Rejeitado", class: "bg-destructive/10 text-destructive" };
+      default:
+        return { label: "Pendente", class: "bg-warning/10 text-warning" };
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
+      {/* Pending Alert */}
+      {pendingCount > 0 && (
+        <div className="mb-6 p-4 bg-warning/10 border border-warning/20 rounded-xl flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
+          <p className="text-sm">
+            <strong>{pendingCount}</strong> comércio{pendingCount > 1 ? "s" : ""} aguardando aprovação
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => setFilterStatus("pending")}
+          >
+            Ver pendentes
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
@@ -206,9 +329,20 @@ export default function AdminBusinessManager() {
               className="pl-10"
             />
           </div>
+          <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="pending">Pendentes</SelectItem>
+              <SelectItem value="approved">Aprovados</SelectItem>
+              <SelectItem value="rejected">Rejeitados</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={filterSponsor} onValueChange={(value: any) => setFilterSponsor(value)}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filtrar" />
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
@@ -247,110 +381,117 @@ export default function AdminBusinessManager() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredBusinesses.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-12 h-12 object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Store className="h-6 w-6 text-primary" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium line-clamp-1">{item.name}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-1 md:hidden">
-                          {getCategoryName(item.categoryId)}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 hidden md:table-cell">
-                    <span className="text-sm">{getCategoryName(item.categoryId)}</span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => toggleSponsor(item.id)}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
-                        item.isSponsor
-                          ? "bg-warning/10 text-warning"
-                          : "bg-muted text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {item.isSponsor ? (
-                        <>
-                          <Star className="h-3.5 w-3.5 fill-current" />
-                          Apoiador
-                        </>
-                      ) : (
-                        <>
-                          <StarOff className="h-3.5 w-3.5" />
-                          Regular
-                        </>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium",
-                        item.approved
-                          ? "bg-success/10 text-success"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {item.approved ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" />
-                          Aprovado
-                        </>
-                      ) : (
-                        <>
-                          <X className="h-3.5 w-3.5" />
-                          Pendente
-                        </>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleApproved(item.id)}
-                        title={item.approved ? "Desaprovar" : "Aprovar"}
-                      >
-                        {item.approved ? (
-                          <X className="h-4 w-4" />
+              {filteredBusinesses.map((item) => {
+                const statusConfig = getStatusConfig(item.status);
+                const isPending = item.status === "pending";
+
+                return (
+                  <tr 
+                    key={item.id} 
+                    className={cn(
+                      "hover:bg-muted/50 transition-colors",
+                      isPending && "bg-warning/5"
+                    )}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="w-12 h-12 object-cover rounded-lg"
+                          />
                         ) : (
-                          <Check className="h-4 w-4" />
+                          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Store className="h-6 w-6 text-primary" />
+                          </div>
                         )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditModal(item)}
+                        <div>
+                          <p className="font-medium line-clamp-1">{item.name}</p>
+                          {isPending && item.owner_name && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {item.owner_name} - {item.owner_phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <span className="text-sm">{getCategoryName(item.category_id)}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => toggleSponsor(item)}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors",
+                          item.is_sponsor
+                            ? "bg-warning/10 text-warning"
+                            : "bg-muted text-muted-foreground hover:bg-muted"
+                        )}
                       >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {item.is_sponsor ? (
+                          <>
+                            <Star className="h-3.5 w-3.5 fill-current" />
+                            Apoiador
+                          </>
+                        ) : (
+                          <>
+                            <StarOff className="h-3.5 w-3.5" />
+                            Regular
+                          </>
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", statusConfig.class)}>
+                        {statusConfig.label}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        {isPending && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-success hover:text-success"
+                              onClick={() => handleApprove(item.id)}
+                              title="Aprovar"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleReject(item.id)}
+                              title="Rejeitar"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(item)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -376,8 +517,8 @@ export default function AdminBusinessManager() {
             <div className="space-y-2">
               <Label>Imagem do Comércio</Label>
               <ImageUpload
-                value={formData.imageUrl}
-                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                value={formData.image_url}
+                onChange={(url) => setFormData({ ...formData, image_url: url })}
                 category="general"
                 aspectRatio="video"
                 recommendedSize="800x450px"
@@ -397,15 +538,15 @@ export default function AdminBusinessManager() {
               <div className="space-y-2">
                 <Label htmlFor="category">Categoria *</Label>
                 <Select
-                  value={formData.categoryId}
-                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                  value={formData.category_id}
+                  onValueChange={(value) => setFormData({ ...formData, category_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {businessCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
                       </SelectItem>
                     ))}
@@ -436,12 +577,12 @@ export default function AdminBusinessManager() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Localização (Google Maps)</Label>
+                <Label htmlFor="location">Referência</Label>
                 <Input
                   id="location"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="https://maps.google.com/..."
+                  placeholder="Próximo à..."
                 />
               </div>
             </div>
@@ -457,7 +598,7 @@ export default function AdminBusinessManager() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="whatsapp">WhatsApp (com DDD)</Label>
+                <Label htmlFor="whatsapp">WhatsApp</Label>
                 <Input
                   id="whatsapp"
                   value={formData.whatsapp}
@@ -469,61 +610,46 @@ export default function AdminBusinessManager() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="instagramUrl">Link do Instagram</Label>
+                <Label htmlFor="instagram_url">Instagram</Label>
                 <Input
-                  id="instagramUrl"
-                  value={formData.instagramUrl}
-                  onChange={(e) => setFormData({ ...formData, instagramUrl: e.target.value })}
+                  id="instagram_url"
+                  value={formData.instagram_url}
+                  onChange={(e) => setFormData({ ...formData, instagram_url: e.target.value })}
                   placeholder="https://instagram.com/..."
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="websiteUrl">Site / Link Externo</Label>
+                <Label htmlFor="website_url">Site</Label>
                 <Input
-                  id="websiteUrl"
-                  value={formData.websiteUrl}
-                  onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                  id="website_url"
+                  value={formData.website_url}
+                  onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
                   placeholder="https://..."
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="openingHours">Horário de Funcionamento</Label>
+              <Label htmlFor="opening_hours">Horário de Funcionamento</Label>
               <Input
-                id="openingHours"
-                value={formData.openingHours}
-                onChange={(e) => setFormData({ ...formData, openingHours: e.target.value })}
-                placeholder="Seg-Sex: 8h-18h | Sáb: 8h-12h"
+                id="opening_hours"
+                value={formData.opening_hours}
+                onChange={(e) => setFormData({ ...formData, opening_hours: e.target.value })}
+                placeholder="Seg-Sex 8h às 18h"
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isSponsor"
-                  checked={formData.isSponsor}
-                  onChange={(e) => setFormData({ ...formData, isSponsor: e.target.checked })}
-                  className="h-4 w-4 rounded border-border"
-                />
-                <Label htmlFor="isSponsor" className="cursor-pointer flex items-center gap-1">
-                  <Star className="h-4 w-4 text-warning" />
-                  Marcar como Apoiador (aparece no carrossel)
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="approved"
-                  checked={formData.approved}
-                  onChange={(e) => setFormData({ ...formData, approved: e.target.checked })}
-                  className="h-4 w-4 rounded border-border"
-                />
-                <Label htmlFor="approved" className="cursor-pointer">
-                  Aprovado (visível no site)
-                </Label>
-              </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_sponsor"
+                checked={formData.is_sponsor}
+                onChange={(e) => setFormData({ ...formData, is_sponsor: e.target.checked })}
+                className="rounded border-border"
+              />
+              <Label htmlFor="is_sponsor" className="cursor-pointer">
+                Marcar como Apoiador
+              </Label>
             </div>
           </div>
 
@@ -531,8 +657,9 @@ export default function AdminBusinessManager() {
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
-              {editingBusiness ? "Salvar" : "Cadastrar"}
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingBusiness ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>

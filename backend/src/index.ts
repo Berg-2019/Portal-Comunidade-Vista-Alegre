@@ -8,6 +8,9 @@ import uploadRoutes from './routes/upload';
 import newsRoutes from './routes/news';
 import settingsRoutes from './routes/settings';
 import businessesRoutes from './routes/businesses';
+import packagesRoutes from './routes/packages';
+import courtsRoutes from './routes/courts';
+import whatsappRoutes from './routes/whatsapp';
 import { initDatabase } from './config/database';
 
 dotenv.config();
@@ -31,6 +34,9 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/businesses', businessesRoutes);
+app.use('/api/packages', packagesRoutes);
+app.use('/api/courts', courtsRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

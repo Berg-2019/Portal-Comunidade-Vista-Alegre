@@ -1,11 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Calendar, Package, Home, LogIn } from "lucide-react";
+import { Menu, X, Home, Newspaper, AlertTriangle, Store, Phone, Calendar, Package, LogIn, TreePine } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Início", href: "/", icon: Home },
+  { label: "Notícias", href: "/noticias", icon: Newspaper },
+  { label: "Ocorrências", href: "/ocorrencias", icon: AlertTriangle },
+  { label: "Comércios", href: "/comercios", icon: Store },
+  { label: "Contatos", href: "/contatos-uteis", icon: Phone },
   { label: "Quadras", href: "/quadras", icon: Calendar },
   { label: "Encomendas", href: "/encomendas", icon: Package },
 ];
@@ -18,25 +22,31 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full glass">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-heading font-bold text-lg">
-            GC
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <TreePine className="h-6 w-6" />
           </div>
-          <span className="hidden font-heading font-semibold text-lg text-foreground sm:block">
-            Gestão Comunitária
-          </span>
+          <div className="hidden sm:block">
+            <span className="font-heading font-semibold text-lg text-foreground block leading-tight">
+              Vista Alegre
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Portal Comunitário
+            </span>
+          </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.href;
+            const isActive = location.pathname === item.href || 
+              (item.href !== "/" && location.pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -51,9 +61,9 @@ export function Header() {
 
         <div className="flex items-center gap-3">
           <Link to="/admin/login">
-            <Button variant="outline" size="sm" className="hidden sm:flex">
+            <Button variant="outline" size="sm" className="hidden md:flex">
               <LogIn className="h-4 w-4 mr-2" />
-              Área Admin
+              Admin
             </Button>
           </Link>
 
@@ -61,7 +71,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="lg:hidden"
             onClick={() => setIsOpen(!isOpen)}
           >
             {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -71,11 +81,12 @@ export function Header() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden border-t border-border bg-card animate-fade-in">
-          <nav className="container py-4 flex flex-col gap-2">
+        <div className="lg:hidden border-t border-border bg-card animate-fade-in">
+          <nav className="container py-4 flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.href;
+              const isActive = location.pathname === item.href ||
+                (item.href !== "/" && location.pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
@@ -96,10 +107,10 @@ export function Header() {
             <Link
               to="/admin/login"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted mt-2 border-t border-border pt-4"
             >
               <LogIn className="h-5 w-5" />
-              Área Admin
+              Área Administrativa
             </Link>
           </nav>
         </div>

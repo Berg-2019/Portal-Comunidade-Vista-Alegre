@@ -6,104 +6,115 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    /* Amazonian Theme - Light Mode */
+    --background: 140 15% 97%;
+    --foreground: 150 25% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 150 25% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 150 25% 12%;
 
-    --primary: 215 80% 45%;
+    /* Primary: Deep Forest Green */
+    --primary: 152 55% 28%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 25% 93%;
-    --secondary-foreground: 215 25% 25%;
+    --secondary: 140 20% 92%;
+    --secondary-foreground: 150 25% 20%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 140 15% 94%;
+    --muted-foreground: 150 15% 40%;
 
-    --accent: 155 65% 42%;
+    /* Accent: River Blue */
+    --accent: 195 70% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 215 80% 45%;
+    --border: 140 15% 85%;
+    --input: 140 15% 85%;
+    --ring: 152 55% 28%;
 
     --radius: 0.75rem;
 
-    /* Custom colors */
-    --success: 155 65% 42%;
+    /* Custom Amazonian colors */
+    --success: 152 55% 35%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 195 70% 42%;
     --info-foreground: 0 0% 100%;
+    
+    /* Earth/Sand tone */
+    --earth: 35 45% 55%;
+    --earth-foreground: 0 0% 100%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(215, 80%, 45%) 0%, hsl(215, 85%, 35%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(215, 80%, 45%) 0%, hsl(220, 75%, 35%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0, 0%, 100%) 0%, hsl(210, 20%, 98%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(152, 55%, 28%) 0%, hsl(152, 60%, 22%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(152, 55%, 28%) 0%, hsl(152, 60%, 18%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0, 0%, 100%) 0%, hsl(140, 15%, 97%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(195, 70%, 42%) 0%, hsl(195, 75%, 35%) 100%);
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-foreground: 150 25% 20%;
+    --sidebar-primary: 152 55% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 140 20% 94%;
+    --sidebar-accent-foreground: 150 25% 15%;
+    --sidebar-border: 140 15% 88%;
+    --sidebar-ring: 152 55% 40%;
   }
 
   .dark {
-    --background: 220 20% 10%;
-    --foreground: 210 20% 95%;
+    /* Amazonian Theme - Dark Mode */
+    --background: 150 20% 8%;
+    --foreground: 140 15% 95%;
 
-    --card: 220 20% 13%;
-    --card-foreground: 210 20% 95%;
+    --card: 150 20% 11%;
+    --card-foreground: 140 15% 95%;
 
-    --popover: 220 20% 13%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 150 20% 11%;
+    --popover-foreground: 140 15% 95%;
 
-    --primary: 215 75% 55%;
+    --primary: 152 50% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 20%;
-    --secondary-foreground: 210 20% 90%;
+    --secondary: 150 20% 18%;
+    --secondary-foreground: 140 15% 90%;
 
-    --muted: 220 20% 18%;
-    --muted-foreground: 215 15% 60%;
+    --muted: 150 20% 15%;
+    --muted-foreground: 140 15% 55%;
 
-    --accent: 155 60% 45%;
+    --accent: 195 65% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 65% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 22%;
-    --input: 220 20% 22%;
-    --ring: 215 75% 55%;
+    --border: 150 20% 20%;
+    --input: 150 20% 20%;
+    --ring: 152 50% 45%;
 
-    --success: 155 60% 45%;
+    --success: 152 50% 40%;
     --warning: 38 85% 55%;
-    --info: 199 80% 55%;
+    --info: 195 65% 50%;
+    --earth: 35 40% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(215, 75%, 55%) 0%, hsl(215, 80%, 40%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(220, 30%, 15%) 0%, hsl(220, 25%, 8%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(220, 20%, 15%) 0%, hsl(220, 20%, 12%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(152, 50%, 45%) 0%, hsl(152, 55%, 35%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(150, 25%, 12%) 0%, hsl(150, 30%, 6%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(150, 20%, 13%) 0%, hsl(150, 20%, 10%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(195, 65%, 50%) 0%, hsl(195, 70%, 40%) 100%);
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 150 20% 10%;
+    --sidebar-foreground: 140 15% 95%;
+    --sidebar-primary: 152 50% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 150 20% 15%;
+    --sidebar-accent-foreground: 140 15% 95%;
+    --sidebar-border: 150 20% 18%;
+    --sidebar-ring: 152 50% 50%;
   }
 }
 
@@ -136,6 +147,14 @@
     background: var(--gradient-card);
   }
 
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .bg-gradient-accent {
+    background: var(--gradient-accent);
+  }
+
   .glass {
     @apply bg-card/80 backdrop-blur-md border border-border/50;
   }
@@ -159,6 +178,11 @@
   .hover-lift:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 40px -12px hsl(var(--primary) / 0.25);
+  }
+
+  /* Amazonian decorative pattern */
+  .pattern-amazon {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 }
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Image,
-  Upload,
   Trash2,
   Save,
   Palette,
@@ -14,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import ImageUpload from "./ImageUpload";
 
 interface SiteSettings {
   siteName: string;
@@ -62,21 +62,17 @@ export default function AdminPageManager() {
   };
 
   const handleSaveSettings = () => {
-    // Em produção, salvaria no banco de dados
+    // Em produção, salvaria no banco de dados via API
     console.log("Salvando configurações:", settings);
     toast({ title: "Configurações salvas com sucesso!" });
   };
 
-  const handleImageUpload = (type: "cover" | "logo" | "court", courtId?: string) => {
-    // Em produção, abriria um file picker e faria upload
-    toast({
-      title: "Upload de Imagem",
-      description: "Funcionalidade de upload será conectada ao backend PostgreSQL.",
-    });
-  };
-
-  const handleCourtImageUpload = (courtId: string) => {
-    handleImageUpload("court", courtId);
+  const handleCourtImageChange = (courtId: string, imageUrl: string) => {
+    setCourtImages((prev) =>
+      prev.map((c) =>
+        c.courtId === courtId ? { ...c, imageUrl } : c
+      )
+    );
   };
 
   const tabs = [
@@ -196,71 +192,26 @@ export default function AdminPageManager() {
               {/* Cover Image */}
               <div className="space-y-3">
                 <Label>Imagem de Capa (Hero)</Label>
-                <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative overflow-hidden">
-                  {settings.coverImageUrl ? (
-                    <>
-                      <img
-                        src={settings.coverImageUrl}
-                        alt="Capa"
-                        className="w-full h-full object-cover"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => handleSettingChange("coverImageUrl", "")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="text-center p-4">
-                      <Image className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Recomendado: 1920x600px
-                      </p>
-                      <Button size="sm" onClick={() => handleImageUpload("cover")}>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                <ImageUpload
+                  value={settings.coverImageUrl}
+                  onChange={(url) => handleSettingChange("coverImageUrl", url)}
+                  category="site"
+                  aspectRatio="video"
+                  recommendedSize="1920x600px"
+                />
               </div>
 
               {/* Logo */}
               <div className="space-y-3">
                 <Label>Logo do Site</Label>
-                <div className="aspect-square max-w-[200px] bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative overflow-hidden">
-                  {settings.logoUrl ? (
-                    <>
-                      <img
-                        src={settings.logoUrl}
-                        alt="Logo"
-                        className="w-full h-full object-contain p-4"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => handleSettingChange("logoUrl", "")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="text-center p-4">
-                      <Image className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-xs text-muted-foreground mb-2">
-                        200x200px
-                      </p>
-                      <Button size="sm" onClick={() => handleImageUpload("logo")}>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                <ImageUpload
+                  value={settings.logoUrl}
+                  onChange={(url) => handleSettingChange("logoUrl", url)}
+                  category="site"
+                  aspectRatio="square"
+                  recommendedSize="200x200px"
+                  className="max-w-[200px]"
+                />
               </div>
             </div>
           </div>
@@ -317,45 +268,13 @@ export default function AdminPageManager() {
               {courtImages.map((court) => (
                 <div key={court.id} className="space-y-3">
                   <Label>{court.courtName}</Label>
-                  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative overflow-hidden">
-                    {court.imageUrl ? (
-                      <>
-                        <img
-                          src={court.imageUrl}
-                          alt={court.courtName}
-                          className="w-full h-full object-cover"
-                        />
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={() => {
-                            setCourtImages((prev) =>
-                              prev.map((c) =>
-                                c.id === court.id ? { ...c, imageUrl: "" } : c
-                              )
-                            );
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="text-center p-4">
-                        <Image className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Recomendado: 800x450px
-                        </p>
-                        <Button
-                          size="sm"
-                          onClick={() => handleCourtImageUpload(court.courtId)}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <ImageUpload
+                    value={court.imageUrl}
+                    onChange={(url) => handleCourtImageChange(court.courtId, url)}
+                    category="courts"
+                    aspectRatio="video"
+                    recommendedSize="800x450px"
+                  />
                 </div>
               ))}
             </div>

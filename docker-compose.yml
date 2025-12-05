@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Frontend React
   web:
     build:
       context: .
@@ -9,12 +10,67 @@ services:
     ports:
       - "80:80"
     restart: unless-stopped
+    depends_on:
+      - api
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # Backend API Node.js
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vista-alegre-api
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=vista_alegre
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres_secret_2024
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - API_BASE_URL=http://localhost:3001
+      - CORS_ORIGIN=http://localhost
+    volumes:
+      - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: vista-alegre-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=vista_alegre
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres_secret_2024
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  uploads_data:
 
 # Para ambiente de produção com SSL (descomente e configure):
 # 

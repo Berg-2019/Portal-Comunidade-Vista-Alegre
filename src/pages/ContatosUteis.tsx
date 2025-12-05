@@ -1,15 +1,52 @@
-import { useState } from "react";
-import { Phone, Search, MapPin, Clock, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Phone, Search, MapPin, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usefulContacts, contactCategories } from "@/data/mockData";
+import { api } from "@/services/api";
+
+interface Contact {
+  id: string;
+  name: string;
+  categoryId: string;
+  phone: string;
+  address?: string;
+  openingHours?: string;
+  description?: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+}
 
 export default function ContatosUteis() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredContacts = usefulContacts.filter(item => {
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [contactsData, categoriesData] = await Promise.all([
+          api.getContacts(),
+          api.getContactCategories(),
+        ]);
+        setContacts(contactsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Error fetching contacts:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const filteredContacts = contacts.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
@@ -24,7 +61,7 @@ export default function ContatosUteis() {
     }
     acc[categoryId].push(contact);
     return acc;
-  }, {} as Record<string, typeof usefulContacts>);
+  }, {} as Record<string, Contact[]>);
 
   return (
     <Layout>
@@ -76,12 +113,12 @@ export default function ContatosUteis() {
             >
               Todos
             </Button>
-            {contactCategories.map(category => (
+            {categories.map(category => (
               <Button
                 key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
+                variant={selectedCategory === category.id.toString() ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedCategory(category.id)}
+                onClick={() => setSelectedCategory(category.id.toString())}
               >
                 {category.name}
               </Button>
@@ -89,16 +126,20 @@ export default function ContatosUteis() {
           </div>
         </div>
 
-        {/* Contacts by Category */}
-        {filteredContacts.length === 0 ? (
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredContacts.length === 0 ? (
           <div className="text-center py-12">
             <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhum contato encontrado.</p>
           </div>
         ) : (
           <div className="space-y-8">
-            {Object.entries(groupedContacts).map(([categoryId, contacts]) => {
-              const category = contactCategories.find(c => c.id === categoryId);
+            {Object.entries(groupedContacts).map(([categoryId, categoryContacts]) => {
+              const category = categories.find(c => c.id.toString() === categoryId);
               if (!category) return null;
               
               return (
@@ -109,7 +150,7 @@ export default function ContatosUteis() {
                   </h2>
                   
                   <div className="grid md:grid-cols-2 gap-4">
-                    {contacts.map((contact, index) => (
+                    {categoryContacts.map((contact, index) => (
                       <div
                         key={contact.id}
                         className="bg-card rounded-xl p-5 shadow-card animate-fade-up"

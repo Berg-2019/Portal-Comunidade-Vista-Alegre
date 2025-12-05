@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -14,28 +15,44 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login, isAuthenticated } = useAuth();
+
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    navigate("/admin/dashboard", { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulated login - replace with actual auth
-    setTimeout(() => {
-      if (email === "admin@comunidade.com" && password === "admin123") {
-        toast({
-          title: "Login realizado com sucesso!",
-          description: "Redirecionando para o painel...",
-        });
-        navigate("/admin/dashboard");
-      } else {
-        toast({
-          title: "Erro no login",
-          description: "E-mail ou senha incorretos.",
-          variant: "destructive",
-        });
-      }
+    try {
+      await login(email, password);
+      toast({
+        title: "Login realizado com sucesso!",
+        description: "Redirecionando para o painel...",
+      });
+      navigate("/admin/dashboard");
+    } catch (error) {
+      toast({
+        title: "Erro no login",
+        description: error instanceof Error ? error.message : "Credenciais inválidas.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -52,7 +69,7 @@ export default function AdminLogin() {
         <div className="bg-card rounded-2xl p-8 shadow-xl animate-scale-in">
           <div className="text-center mb-8">
             <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-heading font-bold text-2xl mb-4">
-              GC
+              VA
             </div>
             <h1 className="font-heading text-2xl font-bold">Área Administrativa</h1>
             <p className="text-muted-foreground mt-2">
@@ -73,6 +90,7 @@ export default function AdminLogin() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -89,6 +107,7 @@ export default function AdminLogin() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -104,12 +123,6 @@ export default function AdminLogin() {
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-muted rounded-xl">
-            <p className="text-xs text-muted-foreground text-center">
-              <strong>Demo:</strong> admin@comunidade.com / admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>

@@ -186,6 +186,52 @@ export async function initDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Contact categories table
+      CREATE TABLE IF NOT EXISTS contact_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Useful contacts table
+      CREATE TABLE IF NOT EXISTS useful_contacts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category_id INTEGER REFERENCES contact_categories(id),
+        phone VARCHAR(50) NOT NULL,
+        address VARCHAR(500),
+        opening_hours VARCHAR(255),
+        description TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Insert default contact categories if not exist
+      INSERT INTO contact_categories (name, slug)
+      SELECT * FROM (VALUES 
+        ('Saúde', 'saude'),
+        ('Segurança', 'seguranca'),
+        ('Educação', 'educacao'),
+        ('Serviços Públicos', 'servicos-publicos'),
+        ('Emergência', 'emergencia')
+      ) AS v(name, slug)
+      WHERE NOT EXISTS (SELECT 1 FROM contact_categories LIMIT 1);
+
+      -- Insert default useful contacts if not exist
+      INSERT INTO useful_contacts (name, category_id, phone, address, opening_hours, description)
+      SELECT name, (SELECT id FROM contact_categories WHERE slug = cat_slug), phone, address, opening_hours, description
+      FROM (VALUES 
+        ('Unidade Básica de Saúde Vista Alegre', 'saude', '(69) 3221-1001', 'Rua da Saúde, 100', 'Seg-Sex: 7h-17h', 'Atendimento médico básico, vacinação e acompanhamento.'),
+        ('Polícia Militar - 190', 'seguranca', '190', NULL, NULL, 'Emergências policiais.'),
+        ('Corpo de Bombeiros - 193', 'emergencia', '193', NULL, NULL, 'Incêndios, resgates e emergências.'),
+        ('SAMU - 192', 'emergencia', '192', NULL, NULL, 'Serviço de Atendimento Móvel de Urgência.'),
+        ('Escola Municipal Vista Alegre', 'educacao', '(69) 3221-2001', 'Rua da Educação, 200', 'Seg-Sex: 7h-17h', 'Ensino fundamental.'),
+        ('CAERD - Companhia de Águas', 'servicos-publicos', '0800 647 0115', NULL, NULL, 'Falta de água, vazamentos, ligações novas.'),
+        ('Energisa - Energia Elétrica', 'servicos-publicos', '0800 647 0120', NULL, NULL, 'Falta de energia, problemas na rede.')
+      ) AS v(name, cat_slug, phone, address, opening_hours, description)
+      WHERE NOT EXISTS (SELECT 1 FROM useful_contacts LIMIT 1);
+
       -- Insert default news categories if not exist
       INSERT INTO news_categories (name, slug)
       SELECT * FROM (VALUES 

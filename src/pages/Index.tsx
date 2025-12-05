@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { 
   Newspaper, AlertTriangle, Store, Phone, Calendar, Package, 
-  MessageCircle, ArrowRight, TreePine, MapPin 
+  ArrowRight, TreePine, MapPin, MessageCircle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
-import { news, occurrences, businesses } from "@/data/mockData";
+import { news, occurrences } from "@/data/mockData";
 import SponsorCarousel from "@/components/SponsorCarousel";
 
 const features = [
@@ -72,8 +72,6 @@ const statusLabels = {
 export default function Index() {
   const recentNews = news.filter(n => n.published).slice(0, 3);
   const recentOccurrences = occurrences.filter(o => o.published).slice(0, 3);
-  const featuredBusinesses = businesses.filter(b => b.approved).slice(0, 4);
-
   return (
     <Layout>
       {/* Hero Section */}
@@ -244,57 +242,6 @@ export default function Index() {
               </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Local Businesses Section */}
-      <section className="bg-muted py-16">
-        <div className="container">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-            <div>
-              <h2 className="font-heading text-2xl md:text-3xl font-bold mb-2">
-                Comércios Locais
-              </h2>
-              <p className="text-muted-foreground">
-                Apoie os negócios da nossa comunidade
-              </p>
-            </div>
-            <Link to="/comercios" className="mt-4 md:mt-0">
-              <Button variant="outline">
-                Ver todos
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {featuredBusinesses.map((business, index) => (
-              <div
-                key={business.id}
-                className="bg-card rounded-xl p-5 shadow-card animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                  <Store className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-1">{business.name}</h3>
-                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                  {business.description}
-                </p>
-                {business.whatsapp && (
-                  <a
-                    href={`https://wa.me/${business.whatsapp}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center text-sm text-primary hover:underline"
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    WhatsApp
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

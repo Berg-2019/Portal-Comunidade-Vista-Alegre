@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { 
-  Store, Search, MapPin, Phone, Clock, MessageCircle,
+  Store, Search, MapPin, Phone, Clock, MessageCircle, Plus,
   ShoppingCart, UtensilsCrossed, Wrench, Pill, Scissors, Briefcase
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
@@ -43,16 +44,12 @@ export default function Comercios() {
               Conheça e apoie os negócios da nossa comunidade. 
               Aqui você encontra mercados, oficinas, restaurantes e muito mais.
             </p>
-            <a
-              href="https://wa.me/5569999999999?text=Olá! Gostaria de cadastrar meu comércio no portal Vista Alegre."
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link to="/cadastro-comercio">
               <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                <Store className="h-5 w-5 mr-2" />
+                <Plus className="h-5 w-5 mr-2" />
                 Cadastrar meu Negócio
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>

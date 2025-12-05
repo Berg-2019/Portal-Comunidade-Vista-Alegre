@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { News, NewsCategory } from "@/types";
 import { news as initialNews, newsCategories } from "@/data/mockData";
+import ImageUpload from "./ImageUpload";
 
 export default function AdminNewsManager() {
   const [newsList, setNewsList] = useState<News[]>(initialNews);
@@ -200,10 +201,21 @@ export default function AdminNewsManager() {
               {filteredNews.map((item) => (
                 <tr key={item.id} className="hover:bg-muted/50 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="font-medium line-clamp-1">{item.title}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-1 md:hidden">
-                      {getCategoryName(item.categoryId)}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="w-12 h-12 object-cover rounded-lg hidden sm:block"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium line-clamp-1">{item.title}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-1 md:hidden">
+                          {getCategoryName(item.categoryId)}
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 hidden md:table-cell">
                     <span className="text-sm">{getCategoryName(item.categoryId)}</span>
@@ -347,35 +359,30 @@ export default function AdminNewsManager() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="imageUrl">URL da Imagem</Label>
-                <Input
-                  id="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={(e) =>
-                    setFormData({ ...formData, imageUrl: e.target.value })
-                  }
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Cole a URL de uma imagem ou faça upload via backend
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="videoUrl">URL do Vídeo (YouTube)</Label>
-                <Input
-                  id="videoUrl"
-                  value={formData.videoUrl}
-                  onChange={(e) =>
-                    setFormData({ ...formData, videoUrl: e.target.value })
-                  }
-                  placeholder="https://youtube.com/watch?v=..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Cole o link do YouTube para incorporar
-                </p>
-              </div>
+            <div className="space-y-2">
+              <Label>Imagem da Notícia</Label>
+              <ImageUpload
+                value={formData.imageUrl}
+                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                category="news"
+                aspectRatio="video"
+                recommendedSize="1200x630px"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="videoUrl">URL do Vídeo (YouTube)</Label>
+              <Input
+                id="videoUrl"
+                value={formData.videoUrl}
+                onChange={(e) =>
+                  setFormData({ ...formData, videoUrl: e.target.value })
+                }
+                placeholder="https://youtube.com/watch?v=..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Cole o link do YouTube para incorporar
+              </p>
             </div>
 
             <div className="flex items-center gap-2">

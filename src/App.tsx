@@ -10,6 +10,7 @@ import Noticias from "./pages/Noticias";
 import NoticiaDetalhe from "./pages/NoticiaDetalhe";
 import Ocorrencias from "./pages/Ocorrencias";
 import Comercios from "./pages/Comercios";
+import CadastroComercio from "./pages/CadastroComercio";
 import ContatosUteis from "./pages/ContatosUteis";
 import Sobre from "./pages/Sobre";
 import Quadras from "./pages/Quadras";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/noticias/:slug" element={<NoticiaDetalhe />} />
           <Route path="/ocorrencias" element={<Ocorrencias />} />
           <Route path="/comercios" element={<Comercios />} />
+          <Route path="/cadastro-comercio" element={<CadastroComercio />} />
           <Route path="/contatos-uteis" element={<ContatosUteis />} />
           <Route path="/sobre" element={<Sobre />} />
           <Route path="/quadras" element={<Quadras />} />

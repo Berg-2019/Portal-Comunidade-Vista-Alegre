@@ -11,6 +11,7 @@ import businessesRoutes from './routes/businesses';
 import packagesRoutes from './routes/packages';
 import courtsRoutes from './routes/courts';
 import whatsappRoutes from './routes/whatsapp';
+import occurrencesRoutes from './routes/occurrences';
 import { initDatabase } from './config/database';
 
 dotenv.config();
@@ -37,6 +38,7 @@ app.use('/api/businesses', businessesRoutes);
 app.use('/api/packages', packagesRoutes);
 app.use('/api/courts', courtsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/occurrences', occurrencesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

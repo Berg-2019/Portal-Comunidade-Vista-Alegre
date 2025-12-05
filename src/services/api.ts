@@ -340,6 +340,110 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Occurrences methods
+  async getOccurrences(params?: { category?: string; status?: string; search?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.search) queryParams.append('search', params.search);
+    const queryString = queryParams.toString();
+    return this.request<any[]>(`/api/occurrences${queryString ? `?${queryString}` : ''}`, {
+      authenticated: false,
+    });
+  }
+
+  async createOccurrence(data: {
+    title?: string;
+    description: string;
+    category: string;
+    location: string;
+    reporter_name: string;
+    reporter_phone?: string;
+    priority?: string;
+    image_url?: string;
+  }) {
+    return this.request<{ success: boolean; message: string; occurrence: any }>('/api/occurrences', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      authenticated: false,
+    });
+  }
+
+  async getAllOccurrences(params?: { status?: string; published?: boolean }) {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.published !== undefined) queryParams.append('published', String(params.published));
+    const queryString = queryParams.toString();
+    return this.request<any[]>(`/api/occurrences/admin/all${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getOccurrenceStats() {
+    return this.request<{
+      total: string;
+      pending: string;
+      in_progress: string;
+      resolved: string;
+      rejected: string;
+      published: string;
+      urgent: string;
+      high_priority: string;
+    }>('/api/occurrences/admin/stats');
+  }
+
+  async getOccurrence(id: string) {
+    return this.request<any>(`/api/occurrences/admin/${id}`);
+  }
+
+  async updateOccurrence(id: string, data: {
+    title?: string;
+    description?: string;
+    category?: string;
+    location?: string;
+    status?: string;
+    priority?: string;
+    admin_notes?: string;
+    published?: boolean;
+  }) {
+    return this.request<any>(`/api/occurrences/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approveOccurrence(id: string, admin_notes?: string) {
+    return this.request<{ success: boolean; occurrence: any }>(`/api/occurrences/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ admin_notes }),
+    });
+  }
+
+  async rejectOccurrence(id: string, admin_notes?: string) {
+    return this.request<{ success: boolean; occurrence: any }>(`/api/occurrences/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ admin_notes }),
+    });
+  }
+
+  async resolveOccurrence(id: string, admin_notes?: string) {
+    return this.request<{ success: boolean; occurrence: any }>(`/api/occurrences/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ admin_notes }),
+    });
+  }
+
+  async deleteOccurrence(id: string) {
+    return this.request<{ success: boolean }>(`/api/occurrences/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async uploadOccurrenceImage(id: string, formData: FormData) {
+    return this.request<{ success: boolean; image_url: string; occurrence: any }>(`/api/occurrences/${id}/image`, {
+      method: 'POST',
+      body: formData,
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

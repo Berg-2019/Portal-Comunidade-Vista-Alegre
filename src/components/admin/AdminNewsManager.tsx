@@ -43,6 +43,8 @@ export default function AdminNewsManager() {
     summary: "",
     content: "",
     categoryId: "",
+    imageUrl: "",
+    videoUrl: "",
     published: false,
   });
 
@@ -58,6 +60,8 @@ export default function AdminNewsManager() {
       summary: "",
       content: "",
       categoryId: "",
+      imageUrl: "",
+      videoUrl: "",
       published: false,
     });
     setEditingNews(null);
@@ -75,6 +79,8 @@ export default function AdminNewsManager() {
       summary: news.summary,
       content: news.content,
       categoryId: news.categoryId,
+      imageUrl: news.imageUrl || "",
+      videoUrl: (news as any).videoUrl || "",
       published: news.published,
     });
     setIsModalOpen(true);
@@ -96,7 +102,12 @@ export default function AdminNewsManager() {
           item.id === editingNews.id
             ? {
                 ...item,
-                ...formData,
+                title: formData.title,
+                summary: formData.summary,
+                content: formData.content,
+                categoryId: formData.categoryId,
+                imageUrl: formData.imageUrl || undefined,
+                published: formData.published,
                 slug: formData.title.toLowerCase().replace(/\s+/g, "-"),
                 updatedAt: new Date().toISOString(),
               }
@@ -107,7 +118,12 @@ export default function AdminNewsManager() {
     } else {
       const newNews: News = {
         id: Date.now().toString(),
-        ...formData,
+        title: formData.title,
+        summary: formData.summary,
+        content: formData.content,
+        categoryId: formData.categoryId,
+        imageUrl: formData.imageUrl || undefined,
+        published: formData.published,
         slug: formData.title.toLowerCase().replace(/\s+/g, "-"),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -329,6 +345,37 @@ export default function AdminNewsManager() {
                 placeholder="Conteúdo completo da notícia (suporta markdown)"
                 rows={8}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="imageUrl">URL da Imagem</Label>
+                <Input
+                  id="imageUrl"
+                  value={formData.imageUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, imageUrl: e.target.value })
+                  }
+                  placeholder="https://exemplo.com/imagem.jpg"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Cole a URL de uma imagem ou faça upload via backend
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="videoUrl">URL do Vídeo (YouTube)</Label>
+                <Input
+                  id="videoUrl"
+                  value={formData.videoUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, videoUrl: e.target.value })
+                  }
+                  placeholder="https://youtube.com/watch?v=..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Cole o link do YouTube para incorporar
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

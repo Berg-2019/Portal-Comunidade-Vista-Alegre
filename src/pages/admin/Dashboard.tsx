@@ -9,7 +9,6 @@ import {
   LogOut,
   Search,
   FileText,
-  Eye,
   Check,
   RotateCcw,
   Menu,
@@ -18,6 +17,9 @@ import {
   Newspaper,
   Calendar,
   Users,
+  AlertCircle,
+  Settings,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +28,12 @@ import { useToast } from "@/hooks/use-toast";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
 import AdminCourtsManager from "@/components/admin/AdminCourtsManager";
 import AdminScheduleManager from "@/components/admin/AdminScheduleManager";
+import AdminOccurrencesManager from "@/components/admin/AdminOccurrencesManager";
+import AdminPageManager from "@/components/admin/AdminPageManager";
+import AdminUsersManager from "@/components/admin/AdminUsersManager";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "pagina" | "usuarios";
 
 interface PackageItem {
   id: string;
@@ -54,8 +59,11 @@ const statusConfig = {
 const navItems = [
   { id: "encomendas" as ActiveTab, label: "Encomendas", icon: Package },
   { id: "noticias" as ActiveTab, label: "Notícias", icon: Newspaper },
+  { id: "ocorrencias" as ActiveTab, label: "Ocorrências", icon: AlertCircle },
   { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
-  { id: "agendamentos" as ActiveTab, label: "Agendamentos Fixos", icon: Users },
+  { id: "agendamentos" as ActiveTab, label: "Agendamentos", icon: Users },
+  { id: "pagina" as ActiveTab, label: "Página", icon: Settings, divider: true },
+  { id: "usuarios" as ActiveTab, label: "Usuários", icon: Shield },
 ];
 
 export default function AdminDashboard() {
@@ -105,6 +113,12 @@ export default function AdminDashboard() {
         return "Gerenciar Quadras";
       case "agendamentos":
         return "Agendamentos Fixos";
+      case "ocorrencias":
+        return "Gerenciar Ocorrências";
+      case "pagina":
+        return "Configurações da Página";
+      case "usuarios":
+        return "Gerenciar Usuários";
       default:
         return "Dashboard";
     }
@@ -145,24 +159,28 @@ export default function AdminDashboard() {
             </Button>
           </div>
 
-          <nav className="space-y-2">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setSidebarOpen(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors",
-                  activeTab === item.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          <nav className="space-y-1">
+            {navItems.map((item, index) => (
+              <div key={item.id}>
+                {item.divider && (
+                  <div className="my-4 border-t border-border" />
                 )}
-              >
-                <item.icon className="h-5 w-5" />
-                {item.label}
-              </button>
+                <button
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSidebarOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors",
+                    activeTab === item.id
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.label}
+                </button>
+              </div>
             ))}
           </nav>
         </div>
@@ -393,11 +411,20 @@ export default function AdminDashboard() {
           {/* Notícias Tab */}
           {activeTab === "noticias" && <AdminNewsManager />}
 
+          {/* Ocorrências Tab */}
+          {activeTab === "ocorrencias" && <AdminOccurrencesManager />}
+
           {/* Quadras Tab */}
           {activeTab === "quadras" && <AdminCourtsManager />}
 
           {/* Agendamentos Tab */}
           {activeTab === "agendamentos" && <AdminScheduleManager />}
+
+          {/* Página Tab */}
+          {activeTab === "pagina" && <AdminPageManager />}
+
+          {/* Usuários Tab */}
+          {activeTab === "usuarios" && <AdminUsersManager />}
         </div>
       </main>
     </div>

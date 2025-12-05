@@ -228,9 +228,9 @@ class ApiService {
     return this.request<any[]>('/api/courts', { authenticated: false });
   }
 
-  async getCourtSlots(courtId: string, dayOfWeek?: number) {
+  async getCourtSlots(courtId: number | string, dayOfWeek?: number) {
     const params = dayOfWeek !== undefined ? `?day_of_week=${dayOfWeek}` : '';
-    return this.request<any[]>(`/api/courts/${courtId}/slots${params}`, { authenticated: false });
+    return this.request<{ slots: any[]; maintenancePeriods: any[] }>(`/api/courts/${courtId}/slots${params}`, { authenticated: false });
   }
 
   async createCourt(data: FormData) {

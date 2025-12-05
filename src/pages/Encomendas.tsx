@@ -1,45 +1,39 @@
-import { useState } from "react";
-import { Package, Search, Clock, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Package, Search, Clock, AlertCircle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Layout } from "@/components/layout/Layout";
 import { cn } from "@/lib/utils";
+import { api } from "@/services/api";
+import { format, parseISO, differenceInDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
+type PackageStatus = "aguardando" | "entregue" | "devolvido";
 
 interface PackageItem {
-  id: string;
-  codigo: string;
-  nome: string;
+  id: number;
+  recipient_name: string;
+  tracking_code: string;
   status: PackageStatus;
-  dataChegada: string;
-  prazoRetirada: string;
-  diasRestantes: number;
+  arrival_date: string;
+  pickup_deadline: string;
+  notes?: string;
 }
 
-const mockPackages: PackageItem[] = [
-  { id: "1", codigo: "RP123456789BR", nome: "Maria Silva", status: "AGUARDANDO", dataChegada: "01/12/2024", prazoRetirada: "08/12/2024", diasRestantes: 5 },
-  { id: "2", codigo: "RP987654321BR", nome: "João Santos", status: "AGUARDANDO", dataChegada: "02/12/2024", prazoRetirada: "09/12/2024", diasRestantes: 6 },
-  { id: "3", codigo: "RP456789123BR", nome: "Ana Oliveira", status: "AGUARDANDO", dataChegada: "28/11/2024", prazoRetirada: "05/12/2024", diasRestantes: 2 },
-  { id: "4", codigo: "RP111222333BR", nome: "Carlos Souza", status: "ENTREGUE", dataChegada: "25/11/2024", prazoRetirada: "02/12/2024", diasRestantes: 0 },
-  { id: "5", codigo: "RP444555666BR", nome: "Paula Costa", status: "DEVOLVIDO", dataChegada: "15/11/2024", prazoRetirada: "22/11/2024", diasRestantes: 0 },
-  { id: "6", codigo: "RP777888999BR", nome: "Roberto Lima", status: "AGUARDANDO", dataChegada: "03/12/2024", prazoRetirada: "10/12/2024", diasRestantes: 7 },
-];
-
 const statusConfig = {
-  AGUARDANDO: { 
+  aguardando: { 
     label: "Aguardando Retirada", 
     icon: Clock, 
     class: "bg-warning/10 text-warning border-warning/20",
     badgeClass: "bg-warning text-warning-foreground"
   },
-  ENTREGUE: { 
+  entregue: { 
     label: "Entregue", 
     icon: CheckCircle, 
     class: "bg-success/10 text-success border-success/20",
     badgeClass: "bg-success text-success-foreground"
   },
-  DEVOLVIDO: { 
+  devolvido: { 
     label: "Devolvido aos Correios", 
     icon: XCircle, 
     class: "bg-destructive/10 text-destructive border-destructive/20",
@@ -48,16 +42,57 @@ const statusConfig = {
 };
 
 export default function Encomendas() {
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PackageStatus | "ALL">("ALL");
 
-  const filteredPackages = mockPackages.filter((pkg) => {
+  useEffect(() => {
+    loadPackages();
+  }, []);
+
+  const loadPackages = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getPackages();
+      setPackages(data);
+    } catch (error) {
+      console.error("Erro ao carregar encomendas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPackages = packages.filter((pkg) => {
     const matchesSearch = 
-      pkg.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+      pkg.recipient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pkg.tracking_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "ALL" || pkg.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const getDaysRemaining = (deadline: string): number => {
+    const deadlineDate = parseISO(deadline);
+    const today = new Date();
+    return differenceInDays(deadlineDate, today);
+  };
+
+  const stats = {
+    total: packages.length,
+    aguardando: packages.filter(p => p.status === "aguardando").length,
+    entregue: packages.filter(p => p.status === "entregue").length,
+    devolvido: packages.filter(p => p.status === "devolvido").length,
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -89,9 +124,9 @@ export default function Encomendas() {
             <div className="flex gap-2 flex-wrap">
               {[
                 { value: "ALL" as const, label: "Todas" },
-                { value: "AGUARDANDO" as const, label: "Aguardando" },
-                { value: "ENTREGUE" as const, label: "Entregues" },
-                { value: "DEVOLVIDO" as const, label: "Devolvidas" },
+                { value: "aguardando" as const, label: "Aguardando" },
+                { value: "entregue" as const, label: "Entregues" },
+                { value: "devolvido" as const, label: "Devolvidas" },
               ].map((filter) => (
                 <Button
                   key={filter.value}
@@ -109,10 +144,10 @@ export default function Encomendas() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Total", value: mockPackages.length, color: "bg-primary/10 text-primary" },
-            { label: "Aguardando", value: mockPackages.filter(p => p.status === "AGUARDANDO").length, color: "bg-warning/10 text-warning" },
-            { label: "Entregues", value: mockPackages.filter(p => p.status === "ENTREGUE").length, color: "bg-success/10 text-success" },
-            { label: "Devolvidas", value: mockPackages.filter(p => p.status === "DEVOLVIDO").length, color: "bg-destructive/10 text-destructive" },
+            { label: "Total", value: stats.total, color: "bg-primary/10 text-primary" },
+            { label: "Aguardando", value: stats.aguardando, color: "bg-warning/10 text-warning" },
+            { label: "Entregues", value: stats.entregue, color: "bg-success/10 text-success" },
+            { label: "Devolvidas", value: stats.devolvido, color: "bg-destructive/10 text-destructive" },
           ].map((stat) => (
             <div key={stat.label} className={cn("rounded-xl p-4", stat.color)}>
               <p className="text-sm opacity-80">{stat.label}</p>
@@ -125,14 +160,19 @@ export default function Encomendas() {
         {filteredPackages.length === 0 ? (
           <div className="text-center py-12 bg-card rounded-xl">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Nenhuma encomenda encontrada</p>
+            <p className="text-muted-foreground">
+              {packages.length === 0 
+                ? "Nenhuma encomenda cadastrada no momento." 
+                : "Nenhuma encomenda encontrada com os filtros aplicados."}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
             {filteredPackages.map((pkg, index) => {
               const config = statusConfig[pkg.status];
               const Icon = config.icon;
-              const isUrgent = pkg.status === "AGUARDANDO" && pkg.diasRestantes <= 2;
+              const daysRemaining = getDaysRemaining(pkg.pickup_deadline);
+              const isUrgent = pkg.status === "aguardando" && daysRemaining <= 2;
 
               return (
                 <div
@@ -150,7 +190,7 @@ export default function Encomendas() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-lg">{pkg.nome}</h3>
+                          <h3 className="font-semibold text-lg">{pkg.recipient_name}</h3>
                           {isUrgent && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive text-destructive-foreground animate-pulse-soft">
                               <AlertCircle className="h-3 w-3" />
@@ -158,24 +198,28 @@ export default function Encomendas() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground font-mono">{pkg.codigo}</p>
+                        <p className="text-sm text-muted-foreground font-mono">{pkg.tracking_code}</p>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm">
                       <div>
                         <p className="text-muted-foreground">Chegada</p>
-                        <p className="font-medium">{pkg.dataChegada}</p>
+                        <p className="font-medium">
+                          {format(parseISO(pkg.arrival_date), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Prazo</p>
-                        <p className="font-medium">{pkg.prazoRetirada}</p>
+                        <p className="font-medium">
+                          {format(parseISO(pkg.pickup_deadline), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
                       </div>
-                      {pkg.status === "AGUARDANDO" && (
+                      {pkg.status === "aguardando" && (
                         <div>
                           <p className="text-muted-foreground">Restam</p>
                           <p className={cn("font-bold", isUrgent ? "text-destructive" : "text-foreground")}>
-                            {pkg.diasRestantes} dias
+                            {daysRemaining > 0 ? `${daysRemaining} dias` : "Vencido"}
                           </p>
                         </div>
                       )}

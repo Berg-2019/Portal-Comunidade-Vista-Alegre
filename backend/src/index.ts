@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import newsRoutes from './routes/news';
 import settingsRoutes from './routes/settings';
+import businessesRoutes from './routes/businesses';
 import { initDatabase } from './config/database';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/businesses', businessesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -66,15 +66,45 @@ export default function CadastroComercio() {
 
     setIsSubmitting(true);
 
-    // Simulate API call - in production, this would send to the backend
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const submitData = new FormData();
+      submitData.append('name', formData.name);
+      submitData.append('description', formData.description);
+      submitData.append('category_id', formData.categoryId);
+      submitData.append('address', formData.address);
+      submitData.append('location', formData.location);
+      submitData.append('phone', formData.phone);
+      submitData.append('whatsapp', formData.whatsapp);
+      submitData.append('instagram_url', formData.instagramUrl);
+      submitData.append('website_url', formData.websiteUrl);
+      submitData.append('opening_hours', formData.openingHours);
+      submitData.append('owner_name', formData.ownerName);
+      submitData.append('owner_phone', formData.ownerPhone);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/businesses/register`, {
+        method: 'POST',
+        body: submitData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao enviar cadastro');
+      }
+
       setIsSubmitted(true);
       toast({
         title: "Cadastro enviado!",
         description: "Seu comércio foi enviado para aprovação. Entraremos em contato em breve.",
       });
-    }, 1500);
+    } catch (error) {
+      toast({
+        title: "Erro ao enviar",
+        description: error instanceof Error ? error.message : "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {

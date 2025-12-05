@@ -123,6 +123,59 @@ class ApiService {
   async getCategories() {
     return this.request<any[]>('/api/news/categories/all', { authenticated: false });
   }
+
+  // Business methods
+  async registerBusiness(data: FormData) {
+    return this.request<{ success: boolean; message: string; business: any }>('/api/businesses/register', {
+      method: 'POST',
+      body: data,
+      authenticated: false,
+    });
+  }
+
+  async getBusinesses(sponsorsOnly = false) {
+    return this.request<any[]>(`/api/businesses${sponsorsOnly ? '?sponsors_only=true' : ''}`, {
+      authenticated: false,
+    });
+  }
+
+  async getBusinessCategories() {
+    return this.request<any[]>('/api/businesses/categories', { authenticated: false });
+  }
+
+  async getAllBusinesses() {
+    return this.request<any[]>('/api/businesses/admin/all');
+  }
+
+  async getPendingBusinessCount() {
+    return this.request<{ count: number }>('/api/businesses/admin/pending-count');
+  }
+
+  async approveBusiness(id: string) {
+    return this.request<{ success: boolean }>(`/api/businesses/admin/${id}/approve`, {
+      method: 'PUT',
+    });
+  }
+
+  async rejectBusiness(id: string) {
+    return this.request<{ success: boolean }>(`/api/businesses/admin/${id}/reject`, {
+      method: 'PUT',
+    });
+  }
+
+  async updateBusiness(id: string, data: FormData | any) {
+    const isFormData = data instanceof FormData;
+    return this.request<{ success: boolean; business: any }>(`/api/businesses/admin/${id}`, {
+      method: 'PUT',
+      body: isFormData ? data : JSON.stringify(data),
+    });
+  }
+
+  async deleteBusiness(id: string) {
+    return this.request<{ success: boolean }>(`/api/businesses/admin/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

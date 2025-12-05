@@ -70,7 +70,36 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
-      -- Insert default categories if not exist
+      CREATE TABLE IF NOT EXISTS business_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        icon VARCHAR(50),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS businesses (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category_id INTEGER REFERENCES business_categories(id),
+        address VARCHAR(500),
+        location VARCHAR(255),
+        phone VARCHAR(20),
+        whatsapp VARCHAR(20),
+        instagram_url VARCHAR(500),
+        website_url VARCHAR(500),
+        opening_hours VARCHAR(255),
+        image_url VARCHAR(500),
+        owner_name VARCHAR(255),
+        owner_phone VARCHAR(20),
+        is_sponsor BOOLEAN DEFAULT false,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Insert default news categories if not exist
       INSERT INTO news_categories (name, slug)
       SELECT * FROM (VALUES 
         ('Avisos', 'avisos'),
@@ -81,6 +110,20 @@ export async function initDatabase() {
         ('Educação', 'educacao')
       ) AS v(name, slug)
       WHERE NOT EXISTS (SELECT 1 FROM news_categories LIMIT 1);
+
+      -- Insert default business categories if not exist
+      INSERT INTO business_categories (name, slug, icon)
+      SELECT * FROM (VALUES 
+        ('Alimentação', 'alimentacao', 'utensils'),
+        ('Comércio', 'comercio', 'shopping-bag'),
+        ('Serviços', 'servicos', 'wrench'),
+        ('Saúde', 'saude', 'heart'),
+        ('Beleza', 'beleza', 'scissors'),
+        ('Educação', 'educacao', 'book'),
+        ('Transporte', 'transporte', 'car'),
+        ('Outros', 'outros', 'more-horizontal')
+      ) AS v(name, slug, icon)
+      WHERE NOT EXISTS (SELECT 1 FROM business_categories LIMIT 1);
 
       -- Insert default settings if not exist
       INSERT INTO site_settings (key, value)

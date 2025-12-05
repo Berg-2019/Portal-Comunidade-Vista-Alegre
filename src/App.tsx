@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { SeasonalThemeProvider } from "@/contexts/SeasonalThemeContext";
+import SeasonalEffects from "@/components/seasonal/SeasonalEffects";
 
 // Pages
 import Index from "./pages/Index";
@@ -27,11 +29,13 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
+    <SeasonalThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <SeasonalEffects />
+        <BrowserRouter>
+          <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/noticias" element={<Noticias />} />
@@ -54,7 +58,8 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </SeasonalThemeProvider>
+</QueryClientProvider>
 );
 
 export default App;

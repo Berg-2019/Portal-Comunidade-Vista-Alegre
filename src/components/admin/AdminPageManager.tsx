@@ -1,12 +1,13 @@
 import { useState } from "react";
 import {
   Image,
-  Trash2,
   Save,
   Palette,
   Type,
   Layout,
+  Sparkles,
 } from "lucide-react";
+import AdminSeasonalTheme from "./AdminSeasonalTheme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +55,7 @@ const initialCourtImages: CourtImage[] = [
 export default function AdminPageManager() {
   const [settings, setSettings] = useState<SiteSettings>(initialSettings);
   const [courtImages, setCourtImages] = useState<CourtImage[]>(initialCourtImages);
-  const [activeTab, setActiveTab] = useState<"geral" | "visual" | "quadras">("geral");
+  const [activeTab, setActiveTab] = useState<"geral" | "visual" | "quadras" | "sazonal">("geral");
   const { toast } = useToast();
 
   const handleSettingChange = (key: keyof SiteSettings, value: string) => {
@@ -79,6 +80,7 @@ export default function AdminPageManager() {
     { id: "geral" as const, label: "Geral", icon: Layout },
     { id: "visual" as const, label: "Visual", icon: Palette },
     { id: "quadras" as const, label: "Fotos Quadras", icon: Image },
+    { id: "sazonal" as const, label: "Tema Sazonal", icon: Sparkles },
   ];
 
   return (
@@ -286,6 +288,9 @@ export default function AdminPageManager() {
           </Button>
         </div>
       )}
+
+      {/* Sazonal Tab */}
+      {activeTab === "sazonal" && <AdminSeasonalTheme />}
     </div>
   );
 }

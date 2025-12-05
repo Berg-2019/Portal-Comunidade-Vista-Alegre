@@ -30,23 +30,33 @@ git clone <URL_DO_REPOSITORIO> vista-alegre-portal
 cd vista-alegre-portal
 ```
 
-### 2. Build e execução
+### 2. Tornar script executável
 
 ```bash
-# Build da imagem
-docker-compose build
-
-# Iniciar em background
-docker-compose up -d
-
-# Verificar se está rodando
-docker-compose ps
-
-# Ver logs
-docker-compose logs -f
+chmod +x scripts/setup.sh
 ```
 
-### 3. Verificar serviços
+### 3. Iniciar aplicação
+
+```bash
+# Modo desenvolvimento (logs em tempo real)
+./scripts/setup.sh dev
+
+# Modo produção (background)
+./scripts/setup.sh start
+```
+
+### 4. Outros comandos úteis
+
+```bash
+./scripts/setup.sh status   # Ver status dos serviços
+./scripts/setup.sh logs     # Ver logs em tempo real
+./scripts/setup.sh stop     # Parar containers
+./scripts/setup.sh restart  # Reiniciar containers
+./scripts/setup.sh backup   # Backup do banco de dados
+```
+
+### 5. Verificar serviços
 
 ```bash
 # Frontend (porta 9070)

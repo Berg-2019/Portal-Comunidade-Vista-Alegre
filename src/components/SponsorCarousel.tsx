@@ -1,21 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, MessageCircle, Instagram, MapPin, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle, Instagram, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { businesses } from "@/data/mockData";
+import { api } from "@/services/api";
 
 interface SponsorBusiness {
-  id: string;
+  id: number;
   name: string;
   description: string;
-  imageUrl?: string;
+  image_url?: string;
   whatsapp?: string;
-  instagramUrl?: string;
+  instagram_url?: string;
   location?: string;
 }
 
 export default function SponsorCarousel() {
-  const sponsors = businesses.filter((b) => b.approved && b.isSponsor) as SponsorBusiness[];
+  const [sponsors, setSponsors] = useState<SponsorBusiness[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
@@ -24,6 +24,18 @@ export default function SponsorCarousel() {
     tablet: 2,
     desktop: 4,
   };
+
+  useEffect(() => {
+    const loadSponsors = async () => {
+      try {
+        const businesses = await api.getBusinesses(true); // sponsors only
+        setSponsors(businesses);
+      } catch (error) {
+        console.error('Error loading sponsors:', error);
+      }
+    };
+    loadSponsors();
+  }, []);
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % Math.max(sponsors.length - itemsPerView.desktop + 1, 1));
@@ -99,9 +111,9 @@ export default function SponsorCarousel() {
                   <div className="bg-background rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-card-hover transition-all duration-300 group">
                     {/* Image */}
                     <div className="aspect-video bg-muted relative overflow-hidden">
-                      {sponsor.imageUrl ? (
+                      {sponsor.image_url ? (
                         <img
-                          src={sponsor.imageUrl}
+                          src={sponsor.image_url}
                           alt={sponsor.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -138,15 +150,15 @@ export default function SponsorCarousel() {
                             href={`https://wa.me/${sponsor.whatsapp}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-success hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             WhatsApp
                           </a>
                         )}
-                        {sponsor.instagramUrl && (
+                        {sponsor.instagram_url && (
                           <a
-                            href={sponsor.instagramUrl}
+                            href={sponsor.instagram_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs text-pink-500 hover:underline"

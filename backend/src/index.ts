@@ -14,6 +14,8 @@ import whatsappRoutes from './routes/whatsapp';
 import occurrencesRoutes from './routes/occurrences';
 import usersRoutes from './routes/users';
 import contactsRoutes from './routes/contacts';
+import schedulesRoutes from './routes/schedules';
+import reservationsRoutes from './routes/reservations';
 import { initDatabase } from './config/database';
 
 dotenv.config();
@@ -43,6 +45,8 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/occurrences', occurrencesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/contacts', contactsRoutes);
+app.use('/api/schedules', schedulesRoutes);
+app.use('/api/reservations', reservationsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

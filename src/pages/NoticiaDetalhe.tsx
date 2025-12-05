@@ -1,15 +1,60 @@
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, Tag, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { news, newsCategories } from "@/data/mockData";
+import { api } from "@/services/api";
+
+interface News {
+  id: number;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  category_id: number;
+  category_name?: string;
+  image_url?: string;
+  created_at: string;
+}
 
 export default function NoticiaDetalhe() {
   const { slug } = useParams();
-  const noticia = news.find(n => n.slug === slug && n.published);
-  const category = noticia ? newsCategories.find(c => c.id === noticia.categoryId) : null;
+  const [noticia, setNoticia] = useState<News | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  if (!noticia) {
+  useEffect(() => {
+    const loadNoticia = async () => {
+      if (!slug) {
+        setError(true);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const data = await api.getNewsBySlug(slug);
+        setNoticia(data);
+      } catch (err) {
+        console.error('Error loading news:', err);
+        setError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadNoticia();
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container py-16 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !noticia) {
     return (
       <Layout>
         <div className="container py-16 text-center">
@@ -36,17 +81,27 @@ export default function NoticiaDetalhe() {
           Voltar para Notícias
         </Link>
 
+        {noticia.image_url && (
+          <div className="mb-8 rounded-xl overflow-hidden">
+            <img 
+              src={noticia.image_url} 
+              alt={noticia.title} 
+              className="w-full h-64 md:h-80 object-cover"
+            />
+          </div>
+        )}
+
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            {category && (
+            {noticia.category_name && (
               <span className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full bg-primary/10 text-primary">
                 <Tag className="h-3 w-3" />
-                {category.name}
+                {noticia.category_name}
               </span>
             )}
             <span className="text-sm text-muted-foreground flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              {new Date(noticia.createdAt).toLocaleDateString('pt-BR', {
+              {new Date(noticia.created_at).toLocaleDateString('pt-BR', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric'

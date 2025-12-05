@@ -196,21 +196,50 @@ export class CourtHandler {
       return;
     }
 
-    const { courtName, dateFormatted, startTime, endTime } = session.data;
+    const { courtId, courtName, date, dateFormatted, startTime, endTime, slotId } = session.data;
+    const userPhone = jid.replace('@s.whatsapp.net', '');
 
-    // Clear session
-    sessionManager.clearSession(jid);
+    try {
+      // Save reservation to database via API
+      await this.apiClient.post('/api/reservations', {
+        court_id: courtId,
+        slot_id: slotId,
+        user_name: text,
+        user_phone: userPhone,
+        reservation_date: date,
+        start_time: startTime,
+        end_time: endTime,
+        source: 'whatsapp'
+      });
 
-    // Send confirmation
-    await sock.sendMessage(jid, { 
-      text: MessageTemplates.reservationConfirmation({
-        courtName,
-        date: dateFormatted,
-        startTime,
-        endTime,
-        name: text
-      })
-    });
+      // Clear session
+      sessionManager.clearSession(jid);
+
+      // Send confirmation
+      await sock.sendMessage(jid, { 
+        text: MessageTemplates.reservationConfirmation({
+          courtName,
+          date: dateFormatted,
+          startTime,
+          endTime,
+          name: text
+        })
+      });
+    } catch (error: any) {
+      console.error('Erro ao salvar reserva:', error);
+      
+      if (error.response?.status === 409) {
+        await sock.sendMessage(jid, { 
+          text: '❌ Este horário já foi reservado por outra pessoa. Por favor, escolha outro horário.\n\nDigite *1* para voltar ao menu principal.'
+        });
+      } else {
+        await sock.sendMessage(jid, { 
+          text: '❌ Ocorreu um erro ao processar sua reserva. Por favor, tente novamente.\n\nDigite *1* para voltar ao menu principal.'
+        });
+      }
+      
+      sessionManager.clearSession(jid);
+    }
   }
 
   private getNextDays(count: number): Date[] {

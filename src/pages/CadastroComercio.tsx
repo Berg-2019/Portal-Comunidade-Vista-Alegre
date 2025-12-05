@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Store, Upload, MapPin, Phone, MessageCircle, Instagram, 
+  Store, MapPin, Phone, MessageCircle, Instagram, 
   Globe, Clock, CheckCircle, ArrowLeft, ImageIcon, X
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { businessCategories } from "@/data/mockData";
+import { api } from "@/services/api";
 
 interface BusinessFormData {
   name: string;
@@ -28,14 +28,25 @@ interface BusinessFormData {
   ownerPhone: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 export default function CadastroComercio() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [businessCategories, setBusinessCategories] = useState<Category[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+
+  useEffect(() => {
+    api.getBusinessCategories().then(setBusinessCategories).catch(console.error);
+  }, []);
   const [formData, setFormData] = useState<BusinessFormData>({
     name: "",
     description: "",
@@ -276,7 +287,7 @@ export default function CadastroComercio() {
                     </SelectTrigger>
                     <SelectContent>
                       {businessCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>
                       ))}

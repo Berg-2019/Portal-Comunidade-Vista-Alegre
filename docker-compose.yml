@@ -1,5 +1,12 @@
 version: '3.8'
 
+# =============================================================================
+# CONFIGURAÇÃO DE PRODUÇÃO - Portal Vista Alegre do Abunã
+# =============================================================================
+# IMPORTANTE: Crie um arquivo .env com as variáveis abaixo antes de executar!
+# Use o arquivo .env.production.example como referência.
+# =============================================================================
+
 services:
   # Frontend React
   web:
@@ -12,6 +19,8 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
@@ -35,12 +44,12 @@ services:
       - PORT=3001
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=vista_alegre
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres_secret_2024
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - API_BASE_URL=http://localhost:3001
-      - CORS_ORIGIN=https://minhavistaalegre.com.br
+      - DB_NAME=${DB_NAME:-vista_alegre}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+      - JWT_SECRET=${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:3001}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://minhavistaalegre.com.br}
     volumes:
       - uploads_data:/app/uploads
     healthcheck:
@@ -78,13 +87,14 @@ services:
     container_name: vista-alegre-db
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=vista_alegre
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres_secret_2024
+      - POSTGRES_DB=${DB_NAME:-vista_alegre}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # ATENÇÃO: Em produção, remova a exposição da porta 5432 para maior segurança
+    # ports:
+    #   - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s

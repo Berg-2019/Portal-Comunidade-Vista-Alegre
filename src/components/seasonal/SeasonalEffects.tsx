@@ -4,13 +4,13 @@ import FireworksEffect from './FireworksEffect';
 import ConfettiEffect from './ConfettiEffect';
 
 export default function SeasonalEffects() {
-  const { theme, snowEnabled, fireworksEnabled, confettiEnabled } = useSeasonalTheme();
+  const { activeTheme, snowEnabled, fireworksEnabled, confettiEnabled } = useSeasonalTheme();
 
   return (
     <>
-      {theme === 'christmas' && snowEnabled && <SnowEffect />}
-      {theme === 'new_year' && fireworksEnabled && <FireworksEffect />}
-      {theme === 'carnaval' && confettiEnabled && <ConfettiEffect />}
+      {activeTheme === 'christmas' && snowEnabled && <SnowEffect />}
+      {activeTheme === 'new_year' && fireworksEnabled && <FireworksEffect />}
+      {activeTheme === 'carnaval' && confettiEnabled && <ConfettiEffect />}
     </>
   );
 }

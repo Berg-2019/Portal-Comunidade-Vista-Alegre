@@ -1,13 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   AlertTriangle, Search, MapPin, MessageCircle, 
-  Lightbulb, Construction, Droplets, Trash2, TreePine, AlertCircle, Filter
+  Lightbulb, Construction, Droplets, Trash2, TreePine, AlertCircle, Filter, Loader2
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { occurrences, occurrenceCategories } from "@/data/mockData";
-import { OccurrenceStatus } from "@/types";
+import { api } from "@/services/api";
+
+interface Occurrence {
+  id: number;
+  title: string | null;
+  description: string;
+  category: string;
+  location: string;
+  reporter_name: string;
+  status: string;
+  priority: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+const CATEGORIES = [
+  { id: 'iluminacao', name: 'Iluminação', icon: 'Lightbulb' },
+  { id: 'buraco', name: 'Buracos/Vias', icon: 'Construction' },
+  { id: 'agua', name: 'Água/Esgoto', icon: 'Droplets' },
+  { id: 'lixo', name: 'Lixo/Limpeza', icon: 'Trash2' },
+  { id: 'seguranca', name: 'Segurança', icon: 'AlertCircle' },
+  { id: 'outros', name: 'Outros', icon: 'TreePine' },
+];
 
 const iconMap: Record<string, React.ElementType> = {
   Lightbulb,
@@ -18,37 +39,56 @@ const iconMap: Record<string, React.ElementType> = {
   AlertCircle,
 };
 
-const statusColors: Record<OccurrenceStatus, string> = {
-  pendente: "bg-warning/10 text-warning border-warning/20",
-  em_analise: "bg-info/10 text-info border-info/20",
-  em_andamento: "bg-accent/10 text-accent border-accent/20",
-  resolvida: "bg-success/10 text-success border-success/20",
-  rejeitada: "bg-destructive/10 text-destructive border-destructive/20",
+const statusColors: Record<string, string> = {
+  pending: "bg-warning/10 text-warning border-warning/20",
+  in_progress: "bg-info/10 text-info border-info/20",
+  resolved: "bg-success/10 text-success border-success/20",
+  rejected: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
-const statusLabels: Record<OccurrenceStatus, string> = {
-  pendente: "Pendente",
-  em_analise: "Em Análise",
-  em_andamento: "Em Andamento",
-  resolvida: "Resolvida",
-  rejeitada: "Rejeitada",
+const statusLabels: Record<string, string> = {
+  pending: "Pendente",
+  in_progress: "Em Andamento",
+  resolved: "Resolvida",
+  rejected: "Rejeitada",
 };
 
 export default function Ocorrencias() {
+  const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<OccurrenceStatus | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
-  const publishedOccurrences = occurrences.filter(o => o.published);
-  
-  const filteredOccurrences = publishedOccurrences.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  useEffect(() => {
+    loadOccurrences();
+  }, []);
+
+  const loadOccurrences = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getOccurrences();
+      setOccurrences(data);
+    } catch (error) {
+      console.error('Erro ao carregar ocorrências:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOccurrences = occurrences.filter(item => {
+    const title = item.title || '';
+    const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
     const matchesStatus = !selectedStatus || item.status === selectedStatus;
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  const getCategoryInfo = (categoryId: string) => {
+    return CATEGORIES.find(c => c.id === categoryId) || { name: 'Outros', icon: 'AlertCircle' };
+  };
 
   return (
     <Layout>
@@ -116,7 +156,7 @@ export default function Ocorrencias() {
             >
               Todas
             </Button>
-            {occurrenceCategories.map(category => {
+            {CATEGORIES.map(category => {
               const Icon = iconMap[category.icon] || AlertCircle;
               return (
                 <Button
@@ -144,21 +184,25 @@ export default function Ocorrencias() {
             >
               Todos
             </Button>
-            {(Object.keys(statusLabels) as OccurrenceStatus[]).map(status => (
+            {Object.entries(statusLabels).map(([status, label]) => (
               <Button
                 key={status}
                 variant={selectedStatus === status ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedStatus(status)}
               >
-                {statusLabels[status]}
+                {label}
               </Button>
             ))}
           </div>
         </div>
 
-        {/* Occurrences List */}
-        {filteredOccurrences.length === 0 ? (
+        {/* Loading */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredOccurrences.length === 0 ? (
           <div className="text-center py-12">
             <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhuma ocorrência encontrada.</p>
@@ -166,8 +210,8 @@ export default function Ocorrencias() {
         ) : (
           <div className="space-y-4">
             {filteredOccurrences.map((item, index) => {
-              const category = occurrenceCategories.find(c => c.id === item.categoryId);
-              const Icon = category ? (iconMap[category.icon] || AlertCircle) : AlertCircle;
+              const category = getCategoryInfo(item.category);
+              const Icon = iconMap[category.icon] || AlertCircle;
               
               return (
                 <div
@@ -184,20 +228,25 @@ export default function Ocorrencias() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[item.status]}`}>
-                          {statusLabels[item.status]}
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[item.status] || statusColors.pending}`}>
+                          {statusLabels[item.status] || 'Pendente'}
                         </span>
-                        {category && (
-                          <span className="text-xs text-muted-foreground">
-                            {category.name}
+                        <span className="text-xs text-muted-foreground">
+                          {category.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          • {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                        </span>
+                        {item.priority === 'urgent' && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                            Urgente
                           </span>
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          • {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                        </span>
                       </div>
                       
-                      <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                      <h3 className="font-semibold text-lg mb-2">
+                        {item.title || `Ocorrência de ${category.name}`}
+                      </h3>
                       <p className="text-muted-foreground mb-3">{item.description}</p>
                       
                       <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -205,13 +254,23 @@ export default function Ocorrencias() {
                           <MapPin className="h-4 w-4" />
                           {item.location}
                         </span>
-                        {item.userName && (
+                        {item.reporter_name && (
                           <span className="text-muted-foreground">
-                            Reportado por: {item.userName}
+                            Reportado por: {item.reporter_name}
                           </span>
                         )}
                       </div>
                     </div>
+
+                    {item.image_url && (
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={item.image_url} 
+                          alt="Foto da ocorrência" 
+                          className="w-24 h-24 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );

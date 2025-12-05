@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Store, MapPin, Phone, MessageCircle, Instagram, 
-  Globe, Clock, CheckCircle, ArrowLeft, ImageIcon, X
+  Globe, Clock, CheckCircle, ArrowLeft, ImageIcon, X, Upload
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";

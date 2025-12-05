@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Store, Upload, MapPin, Phone, MessageCircle, Instagram, 
-  Globe, Clock, CheckCircle, ArrowLeft
+  Globe, Clock, CheckCircle, ArrowLeft, ImageIcon, X
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,11 @@ interface BusinessFormData {
 export default function CadastroComercio() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState<BusinessFormData>({
     name: "",
     description: "",
@@ -50,6 +53,35 @@ export default function CadastroComercio() {
 
   const handleInputChange = (field: keyof BusinessFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: "A imagem deve ter no máximo 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,6 +112,10 @@ export default function CadastroComercio() {
       submitData.append('opening_hours', formData.openingHours);
       submitData.append('owner_name', formData.ownerName);
       submitData.append('owner_phone', formData.ownerPhone);
+      
+      if (imageFile) {
+        submitData.append('image', imageFile);
+      }
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/businesses/register`, {
         method: 'POST',
@@ -174,6 +210,50 @@ export default function CadastroComercio() {
               </h2>
               
               <div className="space-y-4">
+                {/* Image Upload */}
+                <div>
+                  <Label>Logo ou Foto do Comércio</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Adicione uma imagem para destacar seu negócio (opcional, máx. 5MB)
+                  </p>
+                  
+                  {imagePreview ? (
+                    <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full aspect-video rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-2 bg-muted/50"
+                    >
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Clique para selecionar uma imagem
+                      </span>
+                    </button>
+                  )}
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="name">Nome do Comércio *</Label>
                   <Input

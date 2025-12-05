@@ -176,6 +176,170 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Package methods
+  async getPackages(search?: string, status?: string) {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (status && status !== 'ALL') params.append('status', status);
+    const queryString = params.toString();
+    return this.request<any[]>(`/api/packages${queryString ? `?${queryString}` : ''}`, {
+      authenticated: false,
+    });
+  }
+
+  async getAllPackages() {
+    return this.request<any[]>('/api/packages/admin/all');
+  }
+
+  async getPackageStats() {
+    return this.request<{ total: number; aguardando: number; entregue: number; devolvido: number }>('/api/packages/admin/stats');
+  }
+
+  async uploadPackagePdf(formData: FormData) {
+    return this.request<{ success: boolean; results: any }>('/api/packages/upload-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async createPackage(data: { recipient_name: string; tracking_code: string; arrival_date: string; notes?: string }) {
+    return this.request<{ success: boolean; package: any }>('/api/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePackage(id: string, data: { status?: string; notes?: string }) {
+    return this.request<{ success: boolean; package: any }>(`/api/packages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePackage(id: string) {
+    return this.request<{ success: boolean }>(`/api/packages/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Court methods
+  async getCourts() {
+    return this.request<any[]>('/api/courts', { authenticated: false });
+  }
+
+  async getCourtSlots(courtId: string, dayOfWeek?: number) {
+    const params = dayOfWeek !== undefined ? `?day_of_week=${dayOfWeek}` : '';
+    return this.request<any[]>(`/api/courts/${courtId}/slots${params}`, { authenticated: false });
+  }
+
+  async createCourt(data: FormData) {
+    return this.request<{ success: boolean; court: any }>('/api/courts', {
+      method: 'POST',
+      body: data,
+    });
+  }
+
+  async updateCourt(id: string, data: FormData | any) {
+    const isFormData = data instanceof FormData;
+    return this.request<{ success: boolean; court: any }>(`/api/courts/${id}`, {
+      method: 'PUT',
+      body: isFormData ? data : JSON.stringify(data),
+    });
+  }
+
+  async updateCourtMaintenance(id: string, data: {
+    maintenance_mode: boolean;
+    maintenance_reason?: string;
+    maintenance_start?: string;
+    maintenance_end?: string;
+  }) {
+    return this.request<{ success: boolean; court: any }>(`/api/courts/${id}/maintenance`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addMaintenancePeriod(courtId: string, data: {
+    start_date: string;
+    end_date: string;
+    start_time?: string;
+    end_time?: string;
+    reason?: string;
+  }) {
+    return this.request<{ success: boolean; period: any }>(`/api/courts/${courtId}/maintenance-period`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMaintenancePeriod(periodId: string) {
+    return this.request<{ success: boolean }>(`/api/courts/maintenance-period/${periodId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteCourt(id: string) {
+    return this.request<{ success: boolean }>(`/api/courts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addCourtSlot(courtId: string, data: { day_of_week: number; start_time: string; end_time: string }) {
+    return this.request<{ success: boolean; slot: any }>(`/api/courts/${courtId}/slots`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCourtSlot(slotId: string, available: boolean) {
+    return this.request<{ success: boolean; slot: any }>(`/api/courts/slots/${slotId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ available }),
+    });
+  }
+
+  async deleteCourtSlot(slotId: string) {
+    return this.request<{ success: boolean }>(`/api/courts/slots/${slotId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // WhatsApp methods
+  async getWhatsAppGroups() {
+    return this.request<any[]>('/api/whatsapp/groups', { authenticated: false });
+  }
+
+  async getAllWhatsAppGroups() {
+    return this.request<any[]>('/api/whatsapp/groups/admin');
+  }
+
+  async createWhatsAppGroup(data: {
+    name: string;
+    description?: string;
+    category: string;
+    invite_link: string;
+    icon?: string;
+    member_count?: number;
+  }) {
+    return this.request<{ success: boolean; group: any }>('/api/whatsapp/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWhatsAppGroup(id: string, data: any) {
+    return this.request<{ success: boolean; group: any }>(`/api/whatsapp/groups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWhatsAppGroup(id: string) {
+    return this.request<{ success: boolean }>(`/api/whatsapp/groups/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

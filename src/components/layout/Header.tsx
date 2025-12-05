@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Home, Newspaper, AlertTriangle, Store, Phone, Calendar, Package, LogIn, TreePine } from "lucide-react";
+import { Menu, X, Home, Newspaper, AlertTriangle, Store, Phone, Calendar, Package, LogIn, TreePine, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,9 +9,10 @@ const navItems = [
   { label: "Notícias", href: "/noticias", icon: Newspaper },
   { label: "Ocorrências", href: "/ocorrencias", icon: AlertTriangle },
   { label: "Comércios", href: "/comercios", icon: Store },
-  { label: "Contatos", href: "/contatos-uteis", icon: Phone },
   { label: "Quadras", href: "/quadras", icon: Calendar },
   { label: "Encomendas", href: "/encomendas", icon: Package },
+  { label: "Comunidade", href: "/comunidade", icon: MessageCircle },
+  { label: "Contatos", href: "/contatos-uteis", icon: Phone },
 ];
 
 export function Header() {

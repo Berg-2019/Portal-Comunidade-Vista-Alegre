@@ -15,6 +15,7 @@ import ContatosUteis from "./pages/ContatosUteis";
 import Sobre from "./pages/Sobre";
 import Quadras from "./pages/Quadras";
 import Encomendas from "./pages/Encomendas";
+import Comunidade from "./pages/Comunidade";
 
 // Admin Pages
 import AdminLogin from "./pages/admin/Login";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/sobre" element={<Sobre />} />
           <Route path="/quadras" element={<Quadras />} />
           <Route path="/encomendas" element={<Encomendas />} />
+          <Route path="/comunidade" element={<Comunidade />} />
           
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />

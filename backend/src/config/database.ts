@@ -167,6 +167,25 @@ export async function initDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Occurrences table for incident reports
+      CREATE TABLE IF NOT EXISTS occurrences (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255),
+        description TEXT NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        location VARCHAR(500) NOT NULL,
+        reporter_name VARCHAR(255) NOT NULL,
+        reporter_phone VARCHAR(20),
+        status VARCHAR(20) DEFAULT 'pending',
+        priority VARCHAR(20) DEFAULT 'normal',
+        image_url VARCHAR(500),
+        admin_notes TEXT,
+        published BOOLEAN DEFAULT FALSE,
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Insert default news categories if not exist
       INSERT INTO news_categories (name, slug)
       SELECT * FROM (VALUES 

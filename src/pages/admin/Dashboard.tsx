@@ -21,6 +21,8 @@ import {
   Settings,
   Shield,
   Store,
+  MessageCircle,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,9 +36,10 @@ import AdminPageManager from "@/components/admin/AdminPageManager";
 import AdminUsersManager from "@/components/admin/AdminUsersManager";
 import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
 import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
+import { AdminBotManager } from "@/components/admin/AdminBotManager";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "pagina" | "usuarios";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios";
 
 interface PackageItem {
   id: string;
@@ -66,7 +69,8 @@ const navItems = [
   { id: "comercios" as ActiveTab, label: "Comércios", icon: Store },
   { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
   { id: "agendamentos" as ActiveTab, label: "Agendamentos", icon: Users },
-  { id: "whatsapp" as ActiveTab, label: "WhatsApp", icon: Users },
+  { id: "whatsapp" as ActiveTab, label: "Grupos WhatsApp", icon: MessageCircle },
+  { id: "bot" as ActiveTab, label: "Bot WhatsApp", icon: Bot },
   { id: "pagina" as ActiveTab, label: "Página", icon: Settings, divider: true },
   { id: "usuarios" as ActiveTab, label: "Usuários", icon: Shield },
 ];
@@ -124,6 +128,8 @@ export default function AdminDashboard() {
         return "Gerenciar Comércios";
       case "whatsapp":
         return "Grupos WhatsApp";
+      case "bot":
+        return "Bot WhatsApp";
       case "pagina":
         return "Configurações da Página";
       case "usuarios":
@@ -434,6 +440,12 @@ export default function AdminDashboard() {
 
           {/* Comércios Tab */}
           {activeTab === "comercios" && <AdminBusinessManager />}
+
+          {/* WhatsApp Groups Tab */}
+          {activeTab === "whatsapp" && <AdminWhatsAppManager />}
+
+          {/* Bot WhatsApp Tab */}
+          {activeTab === "bot" && <AdminBotManager />}
 
           {/* Usuários Tab */}
           {activeTab === "usuarios" && <AdminUsersManager />}

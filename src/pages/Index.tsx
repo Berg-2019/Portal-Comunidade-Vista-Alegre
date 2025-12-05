@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { 
   Newspaper, AlertTriangle, Store, Phone, Calendar, Package, 
   ArrowRight, TreePine, MapPin, MessageCircle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
-import { news, occurrences } from "@/data/mockData";
+import { api } from "@/services/api";
 import SponsorCarousel from "@/components/SponsorCarousel";
 
 const features = [
@@ -53,25 +54,60 @@ const features = [
   },
 ];
 
-const statusColors = {
-  pendente: "bg-warning/10 text-warning",
-  em_analise: "bg-info/10 text-info",
-  em_andamento: "bg-accent/10 text-accent",
-  resolvida: "bg-success/10 text-success",
-  rejeitada: "bg-destructive/10 text-destructive",
+const statusColors: Record<string, string> = {
+  pending: "bg-warning/10 text-warning",
+  in_progress: "bg-info/10 text-info",
+  resolved: "bg-success/10 text-success",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
-const statusLabels = {
-  pendente: "Pendente",
-  em_analise: "Em Análise",
-  em_andamento: "Em Andamento",
-  resolvida: "Resolvida",
-  rejeitada: "Rejeitada",
+const statusLabels: Record<string, string> = {
+  pending: "Pendente",
+  in_progress: "Em Andamento",
+  resolved: "Resolvida",
+  rejected: "Rejeitada",
 };
+
+interface NewsItem {
+  id: number;
+  title: string;
+  slug: string;
+  summary: string;
+  created_at: string;
+}
+
+interface OccurrenceItem {
+  id: number;
+  title: string;
+  description: string;
+  location: string;
+  status: string;
+  created_at: string;
+}
 
 export default function Index() {
-  const recentNews = news.filter(n => n.published).slice(0, 3);
-  const recentOccurrences = occurrences.filter(o => o.published).slice(0, 3);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [occurrences, setOccurrences] = useState<OccurrenceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [newsData, occurrencesData] = await Promise.all([
+          api.getNews(true).catch(() => []),
+          api.getOccurrences().catch(() => []),
+        ]);
+        setNews(newsData.slice(0, 3));
+        setOccurrences(occurrencesData.slice(0, 3));
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -170,31 +206,51 @@ export default function Index() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {recentNews.map((item, index) => (
-              <Link
-                key={item.id}
-                to={`/noticias/${item.slug}`}
-                className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="h-40 bg-gradient-primary flex items-center justify-center">
-                  <Newspaper className="h-12 w-12 text-primary-foreground/50" />
+          {loading ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-card rounded-xl overflow-hidden shadow-card animate-pulse">
+                  <div className="h-40 bg-muted" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-3 bg-muted rounded w-1/4" />
+                    <div className="h-5 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-full" />
+                  </div>
                 </div>
-                <div className="p-5">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                  </p>
-                  <h3 className="font-heading font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {item.summary}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : news.length > 0 ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {news.map((item, index) => (
+                <Link
+                  key={item.id}
+                  to={`/noticias/${item.slug}`}
+                  className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 animate-fade-up"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="h-40 bg-gradient-primary flex items-center justify-center">
+                    <Newspaper className="h-12 w-12 text-primary-foreground/50" />
+                  </div>
+                  <div className="p-5">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                    <h3 className="font-heading font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {item.summary}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-card rounded-xl">
+              <Newspaper className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Nenhuma notícia publicada ainda.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -217,32 +273,53 @@ export default function Index() {
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
-          {recentOccurrences.map((item, index) => (
-            <div
-              key={item.id}
-              className="bg-card rounded-xl p-5 shadow-card animate-fade-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[item.status]}`}>
-                  {statusLabels[item.status]}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                </span>
+        {loading ? (
+          <div className="grid md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-card rounded-xl p-5 shadow-card animate-pulse">
+                <div className="flex justify-between mb-3">
+                  <div className="h-6 bg-muted rounded w-20" />
+                  <div className="h-4 bg-muted rounded w-16" />
+                </div>
+                <div className="h-5 bg-muted rounded w-3/4 mb-2" />
+                <div className="h-4 bg-muted rounded w-full mb-3" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </div>
-              <h3 className="font-semibold mb-2 line-clamp-2">{item.title}</h3>
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                {item.description}
-              </p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {item.location}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : occurrences.length > 0 ? (
+          <div className="grid md:grid-cols-3 gap-4">
+            {occurrences.map((item, index) => (
+              <div
+                key={item.id}
+                className="bg-card rounded-xl p-5 shadow-card animate-fade-up"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[item.status] || 'bg-muted text-muted-foreground'}`}>
+                    {statusLabels[item.status] || item.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+                <h3 className="font-semibold mb-2 line-clamp-2">{item.title || 'Ocorrência'}</h3>
+                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                  {item.description}
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {item.location}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-card rounded-xl">
+            <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Nenhuma ocorrência registrada.</p>
+          </div>
+        )}
       </section>
 
       {/* Sponsor Carousel */}
@@ -259,16 +336,12 @@ export default function Index() {
             Entre no grupo do WhatsApp da comunidade para receber atualizações, 
             participar de discussões e ajudar a melhorar nosso bairro.
           </p>
-          <a
-            href="https://wa.me/5569999999999"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <Link to="/comunidade">
             <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
               <MessageCircle className="h-5 w-5 mr-2" />
-              Entrar no Grupo
+              Ver Grupos da Comunidade
             </Button>
-          </a>
+          </Link>
         </div>
       </section>
     </Layout>

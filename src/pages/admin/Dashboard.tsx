@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Package,
   Upload,
@@ -37,6 +37,7 @@ import AdminUsersManager from "@/components/admin/AdminUsersManager";
 import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
 import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
 import { AdminBotManager } from "@/components/admin/AdminBotManager";
+import { useAuth } from "@/contexts/AuthContext";
 
 type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
 type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios";
@@ -81,6 +82,13 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/admin/login");
+  };
 
   const filteredPackages = packages.filter(
     (pkg) =>
@@ -201,18 +209,25 @@ export default function AdminDashboard() {
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border">
+          {user && (
+            <p className="text-xs text-muted-foreground mb-3 truncate">
+              Logado como: {user.name}
+            </p>
+          )}
           <Link to="/">
             <Button variant="ghost" className="w-full justify-start mb-2">
               <Home className="h-4 w-4 mr-2" />
               Voltar ao Site
             </Button>
           </Link>
-          <Link to="/admin/login">
-            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-destructive hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sair
+          </Button>
         </div>
       </aside>
 

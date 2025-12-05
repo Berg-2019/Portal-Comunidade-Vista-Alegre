@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SeasonalThemeProvider } from "@/contexts/SeasonalThemeContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { PrivateRoute } from "@/components/PrivateRoute";
 import SeasonalEffects from "@/components/seasonal/SeasonalEffects";
 
 // Pages
@@ -29,37 +31,46 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <SeasonalThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <SeasonalEffects />
-        <BrowserRouter>
-          <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/noticias" element={<Noticias />} />
-          <Route path="/noticias/:slug" element={<NoticiaDetalhe />} />
-          <Route path="/ocorrencias" element={<Ocorrencias />} />
-          <Route path="/comercios" element={<Comercios />} />
-          <Route path="/cadastro-comercio" element={<CadastroComercio />} />
-          <Route path="/contatos-uteis" element={<ContatosUteis />} />
-          <Route path="/sobre" element={<Sobre />} />
-          <Route path="/quadras" element={<Quadras />} />
-          <Route path="/encomendas" element={<Encomendas />} />
-          <Route path="/comunidade" element={<Comunidade />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </SeasonalThemeProvider>
-</QueryClientProvider>
+    <AuthProvider>
+      <SeasonalThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <SeasonalEffects />
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/noticias" element={<Noticias />} />
+              <Route path="/noticias/:slug" element={<NoticiaDetalhe />} />
+              <Route path="/ocorrencias" element={<Ocorrencias />} />
+              <Route path="/comercios" element={<Comercios />} />
+              <Route path="/cadastro-comercio" element={<CadastroComercio />} />
+              <Route path="/contatos-uteis" element={<ContatosUteis />} />
+              <Route path="/sobre" element={<Sobre />} />
+              <Route path="/quadras" element={<Quadras />} />
+              <Route path="/encomendas" element={<Encomendas />} />
+              <Route path="/comunidade" element={<Comunidade />} />
+              
+              {/* Admin Routes */}
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <PrivateRoute>
+                    <AdminDashboard />
+                  </PrivateRoute>
+                }
+              />
+              
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </SeasonalThemeProvider>
+    </AuthProvider>
+  </QueryClientProvider>
 );
 
 export default App;

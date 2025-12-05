@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Pencil,
@@ -9,6 +9,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,25 +24,27 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/services/api";
 
 type UserRole = "admin" | "moderator" | "developer";
 
 interface AdminUser {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: UserRole;
   active: boolean;
   permissions: {
-    encomendas: boolean;
-    noticias: boolean;
-    quadras: boolean;
-    agendamentos: boolean;
-    ocorrencias: boolean;
-    pagina: boolean;
-    usuarios: boolean;
+    encomendas?: boolean;
+    noticias?: boolean;
+    quadras?: boolean;
+    agendamentos?: boolean;
+    ocorrencias?: boolean;
+    comercios?: boolean;
+    pagina?: boolean;
+    usuarios?: boolean;
   };
-  createdAt: string;
+  created_at: string;
 }
 
 const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof User; class: string }> = {
@@ -56,49 +59,15 @@ const PERMISSIONS = [
   { key: "quadras" as const, label: "Quadras" },
   { key: "agendamentos" as const, label: "Agendamentos" },
   { key: "ocorrencias" as const, label: "Ocorrências" },
+  { key: "comercios" as const, label: "Comércios" },
   { key: "pagina" as const, label: "Página (Visual)" },
   { key: "usuarios" as const, label: "Usuários" },
 ];
 
-const initialUsers: AdminUser[] = [
-  {
-    id: "1",
-    name: "Administrador Principal",
-    email: "admin@comunidade.com",
-    role: "developer",
-    active: true,
-    permissions: {
-      encomendas: true,
-      noticias: true,
-      quadras: true,
-      agendamentos: true,
-      ocorrencias: true,
-      pagina: true,
-      usuarios: true,
-    },
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Moderador de Conteúdo",
-    email: "moderador@comunidade.com",
-    role: "moderator",
-    active: true,
-    permissions: {
-      encomendas: true,
-      noticias: true,
-      quadras: false,
-      agendamentos: false,
-      ocorrencias: true,
-      pagina: false,
-      usuarios: false,
-    },
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export default function AdminUsersManager() {
-  const [users, setUsers] = useState<AdminUser[]>(initialUsers);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -115,10 +84,36 @@ export default function AdminUsersManager() {
       quadras: false,
       agendamentos: false,
       ocorrencias: false,
+      comercios: false,
       pagina: false,
       usuarios: false,
     },
   });
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getUsers();
+      setUsers(data.map((user: any) => ({
+        ...user,
+        permissions: typeof user.permissions === 'string' 
+          ? JSON.parse(user.permissions) 
+          : user.permissions || {},
+      })));
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os usuários.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -132,6 +127,7 @@ export default function AdminUsersManager() {
         quadras: false,
         agendamentos: false,
         ocorrencias: false,
+        comercios: false,
         pagina: false,
         usuarios: false,
       },
@@ -152,12 +148,22 @@ export default function AdminUsersManager() {
       email: user.email,
       password: "",
       role: user.role,
-      permissions: { ...user.permissions },
+      permissions: { 
+        encomendas: false,
+        noticias: false,
+        quadras: false,
+        agendamentos: false,
+        ocorrencias: false,
+        comercios: false,
+        pagina: false,
+        usuarios: false,
+        ...user.permissions 
+      },
     });
     setIsModalOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.email) {
       toast({
         title: "Erro",
@@ -176,49 +182,59 @@ export default function AdminUsersManager() {
       return;
     }
 
-    if (editingUser) {
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === editingUser.id
-            ? {
-                ...user,
-                name: formData.name,
-                email: formData.email,
-                role: formData.role,
-                permissions: formData.permissions,
-              }
-            : user
-        )
-      );
-      toast({ title: "Usuário atualizado!" });
-    } else {
-      const newUser: AdminUser = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        active: true,
-        permissions: formData.permissions,
-        createdAt: new Date().toISOString(),
-      };
-      setUsers((prev) => [...prev, newUser]);
-      toast({ title: "Usuário criado!" });
+    setSaving(true);
+    try {
+      if (editingUser) {
+        await api.updateUser(editingUser.id.toString(), {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password || undefined,
+          role: formData.role,
+          permissions: formData.permissions,
+        });
+        toast({ title: "Usuário atualizado!" });
+      } else {
+        await api.createUser({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          permissions: formData.permissions,
+        });
+        toast({ title: "Usuário criado!" });
+      }
+      
+      setIsModalOpen(false);
+      resetForm();
+      fetchUsers();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao salvar usuário.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
-
-    setIsModalOpen(false);
-    resetForm();
   };
 
-  const handleToggleActive = (id: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === id ? { ...user, active: !user.active } : user
-      )
-    );
-    toast({ title: "Status alterado!" });
+  const handleToggleActive = async (user: AdminUser) => {
+    try {
+      await api.updateUser(user.id.toString(), { active: !user.active });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, active: !u.active } : u))
+      );
+      toast({ title: "Status alterado!" });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o status.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (users.length <= 1) {
       toast({
         title: "Erro",
@@ -227,8 +243,18 @@ export default function AdminUsersManager() {
       });
       return;
     }
-    setUsers((prev) => prev.filter((user) => user.id !== id));
-    toast({ title: "Usuário removido!" });
+
+    try {
+      await api.deleteUser(id.toString());
+      setUsers((prev) => prev.filter((user) => user.id !== id));
+      toast({ title: "Usuário removido!" });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Não foi possível remover o usuário.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePermissionChange = (key: keyof typeof formData.permissions) => {
@@ -242,7 +268,6 @@ export default function AdminUsersManager() {
   };
 
   const handleRoleChange = (role: UserRole) => {
-    // Desenvolvedor tem todas as permissões
     if (role === "developer") {
       setFormData((prev) => ({
         ...prev,
@@ -253,6 +278,7 @@ export default function AdminUsersManager() {
           quadras: true,
           agendamentos: true,
           ocorrencias: true,
+          comercios: true,
           pagina: true,
           usuarios: true,
         },
@@ -261,6 +287,14 @@ export default function AdminUsersManager() {
       setFormData((prev) => ({ ...prev, role }));
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -278,7 +312,7 @@ export default function AdminUsersManager() {
       {/* Users List */}
       <div className="space-y-4">
         {users.map((user) => {
-          const roleConfig = ROLE_CONFIG[user.role];
+          const roleConfig = ROLE_CONFIG[user.role] || ROLE_CONFIG.admin;
           const RoleIcon = roleConfig.icon;
 
           return (
@@ -314,7 +348,7 @@ export default function AdminUsersManager() {
                     </div>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {PERMISSIONS.filter((p) => user.permissions[p.key]).map((p) => (
+                      {PERMISSIONS.filter((p) => user.permissions?.[p.key]).map((p) => (
                         <span
                           key={p.key}
                           className="px-2 py-0.5 rounded text-xs bg-muted"
@@ -330,7 +364,7 @@ export default function AdminUsersManager() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleToggleActive(user.id)}
+                    onClick={() => handleToggleActive(user)}
                     title={user.active ? "Desativar" : "Ativar"}
                   >
                     {user.active ? (
@@ -360,6 +394,13 @@ export default function AdminUsersManager() {
           );
         })}
       </div>
+
+      {users.length === 0 && (
+        <div className="text-center py-12 bg-card rounded-xl">
+          <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Nenhum usuário cadastrado.</p>
+        </div>
+      )}
 
       {/* Info */}
       <div className="bg-warning/10 border border-warning/20 rounded-xl p-6">
@@ -496,7 +537,8 @@ export default function AdminUsersManager() {
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {editingUser ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>

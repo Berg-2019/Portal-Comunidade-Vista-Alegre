@@ -444,6 +444,61 @@ class ApiService {
       body: formData,
     });
   }
+
+  // User management methods
+  async getUsers() {
+    return this.request<any[]>('/api/users');
+  }
+
+  async createUser(data: { name: string; email: string; password: string; role: string; permissions: Record<string, boolean> }) {
+    return this.request<any>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateUser(id: string, data: { name?: string; email?: string; password?: string; role?: string; permissions?: Record<string, boolean>; active?: boolean }) {
+    return this.request<any>(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteUser(id: string) {
+    return this.request<{ success: boolean }>(`/api/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Contact methods
+  async getContacts(category?: string) {
+    const params = category ? `?category=${category}` : '';
+    return this.request<any[]>(`/api/contacts${params}`, { authenticated: false });
+  }
+
+  async getContactCategories() {
+    return this.request<any[]>('/api/contacts/categories', { authenticated: false });
+  }
+
+  async createContact(data: { name: string; category_id?: number; phone: string; address?: string; opening_hours?: string; description?: string }) {
+    return this.request<{ success: boolean; contact: any }>('/api/contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateContact(id: string, data: any) {
+    return this.request<{ success: boolean; contact: any }>(`/api/contacts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteContact(id: string) {
+    return this.request<{ success: boolean }>(`/api/contacts/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

@@ -6,6 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 import { news, occurrences, businesses } from "@/data/mockData";
+import SponsorCarousel from "@/components/SponsorCarousel";
 
 const features = [
   {
@@ -296,6 +297,9 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* Sponsor Carousel */}
+      <SponsorCarousel />
 
       {/* WhatsApp CTA */}
       <section className="container py-16">

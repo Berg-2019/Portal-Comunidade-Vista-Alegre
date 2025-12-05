@@ -137,7 +137,7 @@ export default function AdminCourtsManager() {
   const loadSlots = async (courtId: string) => {
     try {
       const data = await api.getCourtSlots(courtId);
-      setTimeSlots(data);
+      setTimeSlots(data.slots || []);
     } catch (error) {
       console.error("Error loading slots:", error);
     }

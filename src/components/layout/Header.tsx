@@ -22,15 +22,15 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full glass">
       <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <TreePine className="h-6 w-6" />
+        <Link to="/" className="flex items-center gap-2 min-w-0 flex-shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground flex-shrink-0">
+            <TreePine className="h-5 w-5" />
           </div>
-          <div className="hidden sm:block">
-            <span className="font-heading font-semibold text-lg text-foreground block leading-tight">
+          <div className="hidden sm:block min-w-0">
+            <span className="font-heading font-semibold text-base text-foreground block leading-tight truncate">
               Vista Alegre
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground truncate block">
               Portal Comunitário
             </span>
           </div>

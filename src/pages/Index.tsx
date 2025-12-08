@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 import { api } from "@/services/api";
+import { useSettings } from "@/hooks/useSettings";
 import SponsorCarousel from "@/components/SponsorCarousel";
 
 // Imagens da comunidade
@@ -94,6 +95,7 @@ export default function Index() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [occurrences, setOccurrences] = useState<OccurrenceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { settings } = useSettings();
 
   useEffect(() => {
     async function fetchData() {
@@ -142,15 +144,25 @@ export default function Index() {
               Conectando moradores, fortalecendo nossa comunidade. 
               Notícias, serviços e informações em um só lugar.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: "0.3s" }}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up flex-wrap" style={{ animationDelay: "0.3s" }}>
               <Link to="/noticias">
                 <Button size="lg" className="w-full sm:w-auto bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg">
                   <Newspaper className="h-5 w-5 mr-2" />
                   Ver Notícias
                 </Button>
               </Link>
+              <a 
+                href={`https://wa.me/${settings?.whatsapp_number || '5569999999999'}?text=${encodeURIComponent('Olá! Gostaria de agendar uma quadra esportiva.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button size="lg" className="w-full sm:w-auto bg-success text-success-foreground hover:bg-success/90 shadow-lg">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Agendar Quadra
+                </Button>
+              </a>
               <Link to="/ocorrencias">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-success/60 text-success hover:bg-success/15 backdrop-blur-sm">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/15 backdrop-blur-sm">
                   <AlertTriangle className="h-5 w-5 mr-2" />
                   Reportar Problema
                 </Button>

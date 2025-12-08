@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/services/api";
+import { useSettings } from "@/hooks/useSettings";
 
 interface Occurrence {
   id: number;
@@ -59,7 +60,7 @@ export default function Ocorrencias() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-
+  const { getWhatsAppLink } = useSettings();
   useEffect(() => {
     loadOccurrences();
   }, []);
@@ -103,7 +104,7 @@ export default function Ocorrencias() {
               Acompanhe os problemas reportados na comunidade e ajude a manter nosso bairro organizado.
             </p>
             <a
-              href="https://wa.me/5569999999999?text=Olá! Gostaria de reportar uma ocorrência no bairro Vista Alegre."
+              href={getWhatsAppLink("Olá! Gostaria de reportar uma ocorrência no bairro Vista Alegre.")}
               target="_blank"
               rel="noopener noreferrer"
             >

@@ -20,7 +20,12 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+    if (!process.env.JWT_SECRET) {
+      console.error('ERRO CRÍTICO: JWT_SECRET não está definido nas variáveis de ambiente');
+      return res.status(500).json({ error: 'Erro de configuração do servidor' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
       id: number;
       email: string;
       role: string;

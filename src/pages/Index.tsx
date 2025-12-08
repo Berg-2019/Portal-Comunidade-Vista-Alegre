@@ -150,7 +150,7 @@ export default function Index() {
                 </Button>
               </Link>
               <Link to="/ocorrencias">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/15 backdrop-blur-sm">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-success/60 text-success hover:bg-success/15 backdrop-blur-sm">
                   <AlertTriangle className="h-5 w-5 mr-2" />
                   Reportar Problema
                 </Button>

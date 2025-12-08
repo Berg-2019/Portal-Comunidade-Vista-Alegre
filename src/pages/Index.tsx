@@ -2,12 +2,17 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
   Newspaper, AlertTriangle, Store, Phone, Calendar, Package, 
-  ArrowRight, TreePine, MapPin, MessageCircle 
+  ArrowRight, TreePine, MapPin, MessageCircle, Users 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 import { api } from "@/services/api";
 import SponsorCarousel from "@/components/SponsorCarousel";
+
+// Imagens da comunidade
+import vistaAereaCidade from "@/assets/vista-aerea-cidade.png";
+import quadrasEsportivas from "@/assets/quadras-esportivas.png";
+import pracaComunidade from "@/assets/praca-comunidade.png";
 
 const features = [
   {
@@ -110,33 +115,42 @@ export default function Index() {
 
   return (
     <Layout>
-      {/* Hero Section */}
-      <section className="relative bg-gradient-hero text-primary-foreground overflow-hidden">
-        <div className="absolute inset-0 pattern-amazon" />
-        <div className="container relative py-16 md:py-24">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-foreground/10 text-sm mb-6 animate-fade-up">
+      {/* Hero Section with Background Image */}
+      <section className="relative min-h-[70vh] flex items-center overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <img 
+            src={vistaAereaCidade} 
+            alt="Vista aérea de Vista Alegre do Abunã" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-primary/70 to-primary/90" />
+        </div>
+        
+        <div className="container relative py-16 md:py-24 z-10">
+          <div className="max-w-3xl mx-auto text-center text-primary-foreground">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm text-sm mb-6 animate-fade-up border border-primary-foreground/20">
               <MapPin className="h-4 w-4" />
               Vista Alegre do Abunã, Porto Velho - RO
             </div>
-            <h1 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <h1 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold mb-6 animate-fade-up drop-shadow-lg" style={{ animationDelay: "0.1s" }}>
               Portal Comunitário
               <br />
-              <span className="text-primary-foreground/90">Vista Alegre</span>
+              <span className="text-primary-foreground/95">Vista Alegre</span>
             </h1>
-            <p className="text-lg md:text-xl text-primary-foreground/85 mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
+            <p className="text-lg md:text-xl text-primary-foreground/90 mb-8 animate-fade-up drop-shadow" style={{ animationDelay: "0.2s" }}>
               Conectando moradores, fortalecendo nossa comunidade. 
               Notícias, serviços e informações em um só lugar.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: "0.3s" }}>
               <Link to="/noticias">
-                <Button size="lg" className="w-full sm:w-auto bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                <Button size="lg" className="w-full sm:w-auto bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg">
                   <Newspaper className="h-5 w-5 mr-2" />
                   Ver Notícias
                 </Button>
               </Link>
               <Link to="/ocorrencias">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/15 backdrop-blur-sm">
                   <AlertTriangle className="h-5 w-5 mr-2" />
                   Reportar Problema
                 </Button>
@@ -144,7 +158,71 @@ export default function Index() {
             </div>
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
+      </section>
+
+      {/* Community Highlights Section */}
+      <section className="container py-16">
+        <div className="text-center mb-12">
+          <h2 className="font-heading text-2xl md:text-3xl font-bold mb-4">
+            Nossa Comunidade
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Vista Alegre do Abunã: uma comunidade vibrante no coração da Amazônia.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Quadras Esportivas Card */}
+          <Link 
+            to="/quadras" 
+            className="group relative rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover-lift"
+          >
+            <div className="aspect-[16/10] overflow-hidden">
+              <img 
+                src={quadrasEsportivas} 
+                alt="Quadras esportivas de Vista Alegre" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-6 text-primary-foreground">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-5 w-5" />
+                <span className="text-sm font-medium text-primary-foreground/80">Esporte & Lazer</span>
+              </div>
+              <h3 className="font-heading text-xl md:text-2xl font-bold mb-2">Quadras Esportivas</h3>
+              <p className="text-primary-foreground/85 text-sm md:text-base">
+                Complexo esportivo com quadras de futebol, vôlei e basquete. Reserve seu horário!
+              </p>
+            </div>
+          </Link>
+
+          {/* Praça da Comunidade Card */}
+          <Link 
+            to="/sobre" 
+            className="group relative rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover-lift"
+          >
+            <div className="aspect-[16/10] overflow-hidden">
+              <img 
+                src={pracaComunidade} 
+                alt="Praça da comunidade Vista Alegre" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-6 text-primary-foreground">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="h-5 w-5" />
+                <span className="text-sm font-medium text-primary-foreground/80">Convivência</span>
+              </div>
+              <h3 className="font-heading text-xl md:text-2xl font-bold mb-2">Praça da Comunidade</h3>
+              <p className="text-primary-foreground/85 text-sm md:text-base">
+                Espaço de lazer e encontro para famílias e moradores. Conheça nossa história!
+              </p>
+            </div>
+          </Link>
+        </div>
       </section>
 
       {/* Features Section */}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Package,
@@ -23,6 +23,7 @@ import {
   Store,
   MessageCircle,
   Bot,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,29 +39,24 @@ import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
 import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
 import { AdminBotManager } from "@/components/admin/AdminBotManager";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/services/api";
 
-type PackageStatus = "AGUARDANDO" | "ENTREGUE" | "DEVOLVIDO";
+type PackageStatus = "aguardando" | "entregue" | "devolvido";
 type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios";
 
 interface PackageItem {
-  id: string;
-  codigo: string;
-  nome: string;
+  id: string | number;
+  tracking_code: string;
+  recipient_name: string;
   status: PackageStatus;
-  dataChegada: string;
-  prazoRetirada: string;
+  arrival_date: string;
+  pickup_deadline: string;
 }
 
-const initialPackages: PackageItem[] = [
-  { id: "1", codigo: "RP123456789BR", nome: "Maria Silva", status: "AGUARDANDO", dataChegada: "01/12/2024", prazoRetirada: "08/12/2024" },
-  { id: "2", codigo: "RP987654321BR", nome: "João Santos", status: "AGUARDANDO", dataChegada: "02/12/2024", prazoRetirada: "09/12/2024" },
-  { id: "3", codigo: "RP456789123BR", nome: "Ana Oliveira", status: "AGUARDANDO", dataChegada: "28/11/2024", prazoRetirada: "05/12/2024" },
-];
-
 const statusConfig = {
-  AGUARDANDO: { label: "Aguardando", icon: Clock, class: "bg-warning/10 text-warning" },
-  ENTREGUE: { label: "Entregue", icon: CheckCircle, class: "bg-success/10 text-success" },
-  DEVOLVIDO: { label: "Devolvido", icon: XCircle, class: "bg-destructive/10 text-destructive" },
+  aguardando: { label: "Aguardando", icon: Clock, class: "bg-warning/10 text-warning" },
+  entregue: { label: "Entregue", icon: CheckCircle, class: "bg-success/10 text-success" },
+  devolvido: { label: "Devolvido", icon: XCircle, class: "bg-destructive/10 text-destructive" },
 };
 
 const navItems = [
@@ -78,12 +74,36 @@ const navItems = [
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("encomendas");
-  const [packages, setPackages] = useState<PackageItem[]>(initialPackages);
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (activeTab === "encomendas") {
+      loadPackages();
+    }
+  }, [activeTab]);
+
+  const loadPackages = async () => {
+    try {
+      setLoadingPackages(true);
+      const data = await api.getPackages();
+      setPackages(data);
+    } catch (error) {
+      console.error("Erro ao carregar encomendas:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as encomendas.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -92,25 +112,35 @@ export default function AdminDashboard() {
 
   const filteredPackages = packages.filter(
     (pkg) =>
-      pkg.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+      pkg.recipient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pkg.tracking_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
     total: packages.length,
-    aguardando: packages.filter((p) => p.status === "AGUARDANDO").length,
-    entregue: packages.filter((p) => p.status === "ENTREGUE").length,
-    devolvido: packages.filter((p) => p.status === "DEVOLVIDO").length,
+    aguardando: packages.filter((p) => p.status === "aguardando").length,
+    entregue: packages.filter((p) => p.status === "entregue").length,
+    devolvido: packages.filter((p) => p.status === "devolvido").length,
   };
 
-  const handleStatusChange = (id: string, newStatus: PackageStatus) => {
-    setPackages((prev) =>
-      prev.map((pkg) => (pkg.id === id ? { ...pkg, status: newStatus } : pkg))
-    );
-    toast({
-      title: "Status atualizado",
-      description: `Encomenda marcada como ${statusConfig[newStatus].label.toLowerCase()}.`,
-    });
+  const handleStatusChange = async (id: string | number, newStatus: PackageStatus) => {
+    try {
+      await api.updatePackage(String(id), { status: newStatus });
+      setPackages((prev) =>
+        prev.map((pkg) => (pkg.id === id ? { ...pkg, status: newStatus } : pkg))
+      );
+      toast({
+        title: "Status atualizado",
+        description: `Encomenda marcada como ${statusConfig[newStatus].label.toLowerCase()}.`,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUpload = () => {
@@ -348,69 +378,77 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {filteredPackages.map((pkg) => {
-                        const config = statusConfig[pkg.status];
-                        const Icon = config.icon;
+                      {loadingPackages ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-12">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredPackages.map((pkg) => {
+                          const config = statusConfig[pkg.status] || statusConfig.aguardando;
+                          const Icon = config.icon;
 
-                        return (
-                          <tr key={pkg.id} className="hover:bg-muted/50 transition-colors">
-                            <td className="px-6 py-4">
-                              <p className="font-medium">{pkg.nome}</p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.codigo}</code>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-muted-foreground">
-                              {pkg.dataChegada}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-muted-foreground">
-                              {pkg.prazoRetirada}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>
-                                <Icon className="h-3.5 w-3.5" />
-                                {config.label}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center justify-end gap-2">
-                                {pkg.status === "AGUARDANDO" && (
-                                  <>
+                          return (
+                            <tr key={pkg.id} className="hover:bg-muted/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <p className="font-medium">{pkg.recipient_name}</p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.tracking_code}</code>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-muted-foreground">
+                                {new Date(pkg.arrival_date).toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-muted-foreground">
+                                {new Date(pkg.pickup_deadline).toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {config.label}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-end gap-2">
+                                  {pkg.status === "aguardando" && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-success hover:text-success"
+                                        onClick={() => handleStatusChange(pkg.id, "entregue")}
+                                      >
+                                        <Check className="h-4 w-4 mr-1" />
+                                        Entregar
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:text-destructive"
+                                        onClick={() => handleStatusChange(pkg.id, "devolvido")}
+                                      >
+                                        <RotateCcw className="h-4 w-4 mr-1" />
+                                        Devolver
+                                      </Button>
+                                    </>
+                                  )}
+                                  {pkg.status !== "aguardando" && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="text-success hover:text-success"
-                                      onClick={() => handleStatusChange(pkg.id, "ENTREGUE")}
-                                    >
-                                      <Check className="h-4 w-4 mr-1" />
-                                      Entregar
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:text-destructive"
-                                      onClick={() => handleStatusChange(pkg.id, "DEVOLVIDO")}
+                                      onClick={() => handleStatusChange(pkg.id, "aguardando")}
                                     >
                                       <RotateCcw className="h-4 w-4 mr-1" />
-                                      Devolver
+                                      Restaurar
                                     </Button>
-                                  </>
-                                )}
-                                {pkg.status !== "AGUARDANDO" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleStatusChange(pkg.id, "AGUARDANDO")}
-                                  >
-                                    <RotateCcw className="h-4 w-4 mr-1" />
-                                    Restaurar
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

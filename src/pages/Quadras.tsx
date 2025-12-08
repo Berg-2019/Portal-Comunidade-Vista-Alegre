@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { format, addDays, startOfToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { api } from "@/services/api";
+import { useSettings } from "@/hooks/useSettings";
 
 type SlotStatus = "LIVRE" | "RESERVADO" | "FIXO" | "MANUTENCAO";
 
@@ -57,7 +58,7 @@ export default function Quadras() {
   const [maintenancePeriods, setMaintenancePeriods] = useState<MaintenancePeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
-
+  const { getWhatsAppLink } = useSettings();
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
   useEffect(() => {
@@ -143,10 +144,9 @@ export default function Quadras() {
 
   const handleReserve = (slot: TimeSlot) => {
     if (!selectedCourt) return;
-    const message = encodeURIComponent(
-      `Quero reservar a ${selectedCourt.name} no dia ${format(selectedDate, "dd/MM", { locale: ptBR })} às ${slot.start_time.slice(0, 5)} em nome de [SEU NOME].`
-    );
-    window.open(`https://wa.me/5500000000000?text=${message}`, "_blank");
+    const message = `Quero reservar a ${selectedCourt.name} no dia ${format(selectedDate, "dd/MM", { locale: ptBR })} às ${slot.start_time.slice(0, 5)} em nome de [SEU NOME].`;
+    const link = getWhatsAppLink(message);
+    window.open(link, "_blank");
   };
 
   const selectedDayOfWeek = selectedDate.getDay();

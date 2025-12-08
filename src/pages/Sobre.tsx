@@ -1,8 +1,11 @@
 import { TreePine, Heart, Users, Target, Mail, MessageCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
+import { useSettings } from "@/hooks/useSettings";
 
 export default function Sobre() {
+  const { settings, getWhatsAppLink } = useSettings();
+
   return (
     <Layout>
       {/* Header */}
@@ -104,7 +107,7 @@ export default function Sobre() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a
-                href="https://wa.me/5569999999999"
+                href={getWhatsAppLink()}
                 target="_blank"
                 rel="noopener noreferrer"
               >

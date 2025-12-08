@@ -56,7 +56,23 @@ chmod +x scripts/setup.sh
 ./scripts/setup.sh backup   # Backup do banco de dados
 ```
 
-### 5. Verificar serviços
+### 5. Criar primeiro usuário administrador
+
+Após os containers estarem rodando, crie o primeiro administrador:
+
+```bash
+curl -X POST http://localhost:3001/api/auth/setup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Administrador",
+    "email": "admin@minhavistaalegre.com.br",
+    "password": "SuaSenhaSeguraAqui123!"
+  }'
+```
+
+**⚠️ IMPORTANTE:** Altere a senha para uma senha forte antes de executar!
+
+### 6. Verificar serviços
 
 ```bash
 # Frontend (porta 9070)
@@ -68,6 +84,12 @@ curl http://localhost:3001/api/health
 # WhatsApp Bot
 curl http://localhost:3002/api/health
 ```
+
+### 7. Primeiro acesso
+
+1. Acesse `http://localhost:9070/admin/login`
+2. Use as credenciais criadas no passo 5
+3. Configure o número do WhatsApp em **Página → Configurações**
 
 ## Configuração com Nginx Reverse Proxy Externo
 
@@ -368,7 +390,42 @@ docker volume inspect vista-alegre-portal_postgres_data
 ├── Dockerfile             # Dockerfile do frontend
 ├── docker-compose.yml     # Orquestração de containers
 ├── nginx.conf             # Configuração do Nginx (frontend)
-└── DEPLOYMENT.md          # Este arquivo
+├── DEPLOYMENT.md          # Este arquivo
+└── DATABASE.md            # Documentação do banco de dados
+```
+
+## Checklist de Segurança Pré-Deploy
+
+Antes de colocar em produção, verifique:
+
+### Variáveis de Ambiente
+- [ ] `JWT_SECRET` definido com chave forte (mínimo 64 caracteres)
+- [ ] `DB_PASSWORD` definido com senha forte
+- [ ] `CORS_ORIGIN` configurado apenas para o domínio de produção
+- [ ] `API_BASE_URL` apontando para o domínio correto
+
+### Nginx/SSL
+- [ ] Certificado SSL configurado (Let's Encrypt)
+- [ ] Redirect HTTP → HTTPS ativo
+- [ ] Headers de segurança configurados (X-Frame-Options, etc.)
+
+### Banco de Dados
+- [ ] Backup automático configurado (crontab)
+- [ ] Senha do PostgreSQL alterada do padrão
+
+### Aplicação
+- [ ] Primeiro admin criado via `/api/auth/setup`
+- [ ] Número de WhatsApp configurado nas configurações do site
+- [ ] Imagens de capa e logo configuradas
+
+### Gerar senhas seguras
+
+```bash
+# Gerar JWT_SECRET (64 caracteres)
+openssl rand -base64 64
+
+# Gerar DB_PASSWORD (32 caracteres)
+openssl rand -base64 32
 ```
 
 ## Suporte

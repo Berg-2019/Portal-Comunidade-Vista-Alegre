@@ -36,6 +36,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
+    if (!process.env.JWT_SECRET) {
+      console.error('ERRO CRÍTICO: JWT_SECRET não está definido nas variáveis de ambiente');
+      return res.status(500).json({ error: 'Erro de configuração do servidor' });
+    }
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -43,7 +48,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         permissions: user.permissions,
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 

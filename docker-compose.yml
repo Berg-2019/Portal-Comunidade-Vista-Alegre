@@ -1,10 +1,9 @@
-version: '3.8'
-
 # =============================================================================
 # CONFIGURAÇÃO DE PRODUÇÃO - Portal Vista Alegre do Abunã
 # =============================================================================
 # IMPORTANTE: Crie um arquivo .env com as variáveis abaixo antes de executar!
 # Use o arquivo .env.production.example como referência.
+# NOTA: Use 'docker compose' (v2) em vez de 'docker-compose' (v1)
 # =============================================================================
 
 services:
@@ -21,8 +20,9 @@ services:
       - api
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+      - VITE_BOT_API_URL=${VITE_BOT_API_URL:-http://localhost:3002}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/index.html"]
       interval: 30s
       timeout: 10s
       retries: 3

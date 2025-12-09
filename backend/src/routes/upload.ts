@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { upload, uploadErrorHandler } from '../middleware/upload';
-import { authMiddleware, AuthRequest, requirePermission } from '../middleware/auth';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { query } from '../config/database';
 
 const router = Router();
@@ -22,7 +22,7 @@ router.post(
   authMiddleware,
   upload.single('image'),
   uploadErrorHandler,
-  async (req: AuthRequest, res) => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
@@ -68,7 +68,7 @@ router.post(
   authMiddleware,
   upload.array('images', 10),
   uploadErrorHandler,
-  async (req: AuthRequest, res) => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const files = req.files as Express.Multer.File[];
       
@@ -119,7 +119,7 @@ router.post(
 );
 
 // Delete image
-router.delete('/:filename', authMiddleware, async (req: AuthRequest, res) => {
+router.delete('/:filename', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { filename } = req.params;
     const category = req.query.category as string || 'general';
@@ -152,7 +152,7 @@ router.delete('/:filename', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // List uploaded files
-router.get('/', authMiddleware, async (req: AuthRequest, res) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const category = req.query.category as string;
     const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3001}`;

@@ -39,6 +39,7 @@ export class WhatsAppBot {
   private lastConnected: Date | null = null;
   private startTime: Date | null = null;
   private messageHandler: MessageHandler | null = null;
+  private shouldReconnect: boolean = false; // Controle de reconexão manual
 
   // Metrics
   private metrics: BotMetrics = {
@@ -54,13 +55,20 @@ export class WhatsAppBot {
   private responseTimes: number[] = [];
 
   async connect(handler: MessageHandler): Promise<void> {
-    if (this.connecting || this.connected) {
-      console.log('Bot já está conectado ou conectando');
+    if (this.connecting) {
+      console.log('Bot já está conectando, aguarde...');
+      return;
+    }
+    
+    if (this.connected) {
+      console.log('Bot já está conectado');
       return;
     }
 
     this.connecting = true;
+    this.shouldReconnect = true; // Só reconecta se connect() foi chamado manualmente
     this.messageHandler = handler;
+    this.qrCode = null; // Limpa QR code anterior
 
     try {
       const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
@@ -80,30 +88,47 @@ export class WhatsAppBot {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-          console.log('📱 QR Code gerado');
-          this.qrCode = await QRCode.toDataURL(qr);
+          console.log('📱 QR Code gerado - escaneie para conectar');
+          try {
+            this.qrCode = await QRCode.toDataURL(qr);
+            console.log('✅ QR Code convertido para base64');
+          } catch (err) {
+            console.error('❌ Erro ao gerar QR Code base64:', err);
+          }
         }
 
         if (connection === 'close') {
           this.connected = false;
           this.connecting = false;
+          
           const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+          console.log('🔌 Conexão fechada. Código:', reason);
 
           if (reason === DisconnectReason.loggedOut) {
-            console.log('❌ Bot deslogado');
+            console.log('❌ Bot deslogado pelo usuário');
             this.qrCode = null;
-          } else {
-            console.log('🔄 Reconectando...');
+            this.shouldReconnect = false;
+          } else if (reason === DisconnectReason.restartRequired) {
+            console.log('🔄 Restart necessário');
+            if (this.shouldReconnect && handler) {
+              setTimeout(() => this.connect(handler), 3000);
+            }
+          } else if (this.shouldReconnect && handler) {
+            // Só reconecta se shouldReconnect está ativo
+            console.log('🔄 Tentando reconectar em 5 segundos...');
             setTimeout(() => this.connect(handler), 5000);
+          } else {
+            console.log('⏹️ Reconexão automática desabilitada');
           }
         } else if (connection === 'open') {
-          console.log('✅ Bot conectado!');
+          console.log('✅ Bot conectado com sucesso!');
           this.connected = true;
           this.connecting = false;
-          this.qrCode = null;
+          this.qrCode = null; // Limpa QR após conectar
           this.lastConnected = new Date();
           this.startTime = new Date();
           this.phoneNumber = this.sock?.user?.id?.split(':')[0] || null;
+          console.log('📞 Número conectado:', this.phoneNumber);
         }
       });
 
@@ -135,20 +160,31 @@ export class WhatsAppBot {
 
     } catch (error) {
       this.connecting = false;
+      this.shouldReconnect = false;
       console.error('Erro ao conectar:', error);
       throw error;
     }
   }
 
   async disconnect(): Promise<void> {
+    console.log('🔌 Desconectando bot...');
+    this.shouldReconnect = false; // Desabilita reconexão automática
+    
     if (this.sock) {
-      await this.sock.logout();
+      try {
+        await this.sock.logout();
+      } catch (error) {
+        console.log('Erro ao fazer logout (pode ser normal se já desconectado):', error);
+      }
       this.sock = null;
-      this.connected = false;
-      this.connecting = false;
-      this.qrCode = null;
-      this.phoneNumber = null;
     }
+    
+    this.connected = false;
+    this.connecting = false;
+    this.qrCode = null;
+    this.phoneNumber = null;
+    this.startTime = null;
+    console.log('✅ Bot desconectado');
   }
 
   getStatus(): BotStatus {

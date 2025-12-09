@@ -25,8 +25,10 @@ router.post(
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  return;
       }
+
 
       const category = req.query.category as string || 'general';
       const relativePath = `/uploads/${category}/${req.file.filename}`;
@@ -73,7 +75,8 @@ router.post(
       const files = req.files as Express.Multer.File[];
       
       if (!files || files.length === 0) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+         res.status(400).json({ error: 'Nenhum arquivo enviado' });
+         return;
       }
 
       const category = req.query.category as string || 'general';
@@ -131,7 +134,8 @@ router.delete('/:filename', authMiddleware, async (req: AuthRequest, res: Respon
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Arquivo não encontrado' });
+       res.status(404).json({ error: 'Arquivo não encontrado' });
+       return;
     }
 
     // Delete from filesystem

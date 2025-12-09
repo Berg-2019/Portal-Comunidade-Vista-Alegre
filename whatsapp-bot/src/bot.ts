@@ -78,7 +78,6 @@ export class WhatsAppBot {
 
       this.sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
         logger,
         browser: ['Vista Alegre Bot', 'Chrome', '120.0.0']
       });

@@ -1,15 +1,21 @@
 import makeWASocket, {
-  DisconnectReason,
-  useMultiFileAuthState,
   WASocket,
-  proto,
-  ConnectionState
+  proto
 } from '@whiskeysockets/baileys';
+import { useMultiFileAuthState } from '@whiskeysockets/baileys/lib/Utils/use-multi-file-auth-state';
+import type { ConnectionState } from '@whiskeysockets/baileys/lib/Types/State';
+
+// Define DisconnectReason locally since it's not exported in this version
+const DisconnectReason = {
+  loggedOut: 401,
+  restartRequired: 515
+};
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import fs from 'fs';
 import path from 'path';
+
 export interface BotStatus {
   connected: boolean;
   connecting: boolean;
@@ -132,7 +138,7 @@ export class WhatsAppBot {
         }
       });
 
-      this.sock.ev.on('messages.upsert', async ({ messages }) => {
+      this.sock.ev.on('messages.upsert', async ({ messages }: { messages: proto.IWebMessageInfo[] }) => {
         for (const msg of messages) {
           if (!msg.key.fromMe && msg.message) {
             this.metrics.messagesReceived++;
@@ -169,7 +175,7 @@ export class WhatsAppBot {
   async disconnect(): Promise<void> {
     console.log('🔌 Desconectando bot...');
     this.shouldReconnect = false; // Desabilita reconexão automática
-    
+
     if (this.sock) {
       try {
         await this.sock.logout();
@@ -178,7 +184,7 @@ export class WhatsAppBot {
       }
       this.sock = null;
     }
-    
+
     this.connected = false;
     this.connecting = false;
     this.qrCode = null;
@@ -188,48 +194,52 @@ export class WhatsAppBot {
   }
 
   async clearSession(): Promise<void> {
-    console.log('🗑️ Limpando sessão do bot...');
-    this.shouldReconnect = false;
-    
-    // Desconecta se estiver conectado
-    if (this.sock) {
-      try {
-        await this.sock.logout();
-      } catch (error) {
-        console.log('Aviso ao desconectar durante limpeza:', error);
-      }
-      this.sock = null;
+  console.log('🗑️ Limpando sessão do bot...');
+  this.shouldReconnect = false;
+
+  if (this.sock) {
+    try {
+      await this.sock.logout();      // garante fechamento
+    } catch (error) {
+      console.log('Aviso ao desconectar durante limpeza:', error);
     }
-    
-    // Remove a pasta auth_info
-    const authPath = path.join(process.cwd(), 'auth_info');
-    if (fs.existsSync(authPath)) {
-      fs.rmSync(authPath, { recursive: true, force: true });
-      console.log('✅ Pasta auth_info removida');
-    }
-    
-    // Reset do estado
-    this.connected = false;
-    this.connecting = false;
-    this.qrCode = null;
-    this.phoneNumber = null;
-    this.startTime = null;
-    this.lastConnected = null;
-    
-    // Reset das métricas
-    this.metrics = {
-      messagesReceived: 0,
-      messagesSent: 0,
-      reservationsProcessed: 0,
-      occurrencesProcessed: 0,
-      packagesQueried: 0,
-      averageResponseTime: 0,
-      errors: 0
-    };
-    this.responseTimes = [];
-    
-    console.log('✅ Sessão limpa com sucesso. Um novo QR será gerado ao conectar.');
+    this.sock = null;
   }
+
+  // espera um pouco para o FS liberar arquivos
+  await new Promise(r => setTimeout(r, 500));
+
+  const authPath = path.join(process.cwd(), 'auth_info');
+  if (fs.existsSync(authPath)) {
+    try {
+      await fs.promises.rm(authPath, { recursive: true, force: true });
+      console.log('✅ Pasta auth_info removida');
+    } catch (err: any) {
+      console.error('Erro ao remover auth_info:', err);
+      // se quiser, apenas loga e não quebra a API
+    }
+  }
+
+  this.connected = false;
+  this.connecting = false;
+  this.qrCode = null;
+  this.phoneNumber = null;
+  this.startTime = null;
+  this.lastConnected = null;
+  this.metrics = {
+    messagesReceived: 0,
+    messagesSent: 0,
+    reservationsProcessed: 0,
+    occurrencesProcessed: 0,
+    packagesQueried: 0,
+    averageResponseTime: 0,
+    errors: 0
+  };
+  this.responseTimes = [];
+
+  console.log('✅ Sessão limpa (ou tentativa concluída).');
+}
+
 
   getStatus(): BotStatus {
     return {

@@ -15,11 +15,13 @@ O projeto utiliza arquitetura de microserviços com os seguintes containers:
 
 ## Pré-requisitos
 
-- Docker e Docker Compose instalados
+- Docker e Docker Compose v2 instalados (`docker compose` em vez de `docker-compose`)
 - Git instalado
 - Acesso ao servidor (VM no Proxmox ou similar)
 - VM dedicada com Nginx para reverse proxy (recomendado)
 - Domínio configurado (minhavistaalegre.com.br)
+
+> **Nota:** Este projeto usa Docker Compose v2. Use `docker compose` (sem hífen) em vez de `docker-compose`.
 
 ## Deploy Rápido
 
@@ -260,18 +262,18 @@ openssl rand -base64 64
 
 ```bash
 # Parar containers
-docker-compose down
+docker compose down
 
 # Rebuild após mudanças
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 
 # Ver logs em tempo real
-docker-compose logs -f
+docker compose logs -f
 
 # Logs de serviço específico
-docker-compose logs -f api
-docker-compose logs -f whatsapp-bot
+docker compose logs -f api
+docker compose logs -f whatsapp-bot
 
 # Acessar shell do container
 docker exec -it vista-alegre-portal sh
@@ -330,7 +332,7 @@ Os endpoints de health check estão disponíveis:
 
 ```bash
 # Status geral
-docker-compose ps
+docker compose ps
 
 # Saúde dos containers
 docker inspect --format='{{.State.Health.Status}}' vista-alegre-portal
@@ -344,7 +346,7 @@ docker inspect --format='{{.State.Health.Status}}' vista-alegre-db
 
 ```bash
 # Ver logs detalhados
-docker-compose logs --tail=100 <serviço>
+docker compose logs --tail=100 <serviço>
 
 # Verificar se portas estão ocupadas
 netstat -tlnp | grep -E '9070|3001|3002|5432'
@@ -354,7 +356,7 @@ netstat -tlnp | grep -E '9070|3001|3002|5432'
 
 ```bash
 # Verificar se o banco está rodando
-docker-compose ps db
+docker compose ps db
 
 # Testar conexão
 docker exec -it vista-alegre-api sh -c "nc -zv db 5432"
@@ -403,6 +405,7 @@ Antes de colocar em produção, verifique:
 - [ ] `DB_PASSWORD` definido com senha forte
 - [ ] `CORS_ORIGIN` configurado apenas para o domínio de produção
 - [ ] `API_BASE_URL` apontando para o domínio correto
+- [ ] `VITE_BOT_API_URL` apontando para URL correta do Bot WhatsApp
 
 ### Nginx/SSL
 - [ ] Certificado SSL configurado (Let's Encrypt)

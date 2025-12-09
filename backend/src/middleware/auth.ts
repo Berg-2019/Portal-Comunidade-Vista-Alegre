@@ -56,3 +56,6 @@ export function requirePermission(permission: string) {
     next();
   };
 }
+
+// Alias for compatibility with routes that import authenticateToken
+export const authenticateToken = authMiddleware;

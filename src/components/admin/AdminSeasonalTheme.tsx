@@ -10,15 +10,120 @@ import { useSeasonalTheme, SeasonalTheme, ThemeSchedule } from '@/contexts/Seaso
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
+// Color palettes for each theme (for preview)
+const themeColors: Record<SeasonalTheme, { primary: string; secondary: string; accent: string; bg: string }> = {
+  default: {
+    primary: 'hsl(152, 45%, 35%)',
+    secondary: 'hsl(200, 60%, 40%)',
+    accent: 'hsl(45, 80%, 50%)',
+    bg: 'hsl(145, 25%, 96%)',
+  },
+  christmas: {
+    primary: 'hsl(0, 70%, 45%)',
+    secondary: 'hsl(140, 50%, 35%)',
+    accent: 'hsl(45, 90%, 55%)',
+    bg: 'hsl(0, 30%, 97%)',
+  },
+  new_year: {
+    primary: 'hsl(45, 90%, 55%)',
+    secondary: 'hsl(280, 50%, 50%)',
+    accent: 'hsl(200, 80%, 60%)',
+    bg: 'hsl(240, 15%, 15%)',
+  },
+  easter: {
+    primary: 'hsl(280, 50%, 65%)',
+    secondary: 'hsl(330, 50%, 70%)',
+    accent: 'hsl(50, 80%, 70%)',
+    bg: 'hsl(280, 30%, 97%)',
+  },
+  carnaval: {
+    primary: 'hsl(280, 80%, 55%)',
+    secondary: 'hsl(45, 100%, 55%)',
+    accent: 'hsl(160, 80%, 45%)',
+    bg: 'hsl(280, 30%, 97%)',
+  },
+};
+
 const themeOptions: { value: SeasonalTheme; label: string; description: string; icon: string }[] = [
-  { value: 'default', label: 'Padrão', description: 'Tema padrão do site com cores da comunidade', icon: '🌿' },
-  { value: 'christmas', label: 'Natal', description: 'Vermelho, verde e dourado com clima natalino', icon: '🎄' },
-  { value: 'new_year', label: 'Ano Novo', description: 'Fundo escuro com detalhes dourados e festivos', icon: '🎆' },
-  { value: 'easter', label: 'Páscoa', description: 'Cores pastéis com detalhes delicados', icon: '🐰' },
-  { value: 'carnaval', label: 'Carnaval', description: 'Cores vibrantes e clima de festa', icon: '🎭' },
+  { value: 'default', label: 'Padrão (Amazônico)', description: 'Tons de verde, azul e terra inspirados na região', icon: '🌿' },
+  { value: 'christmas', label: 'Natal', description: 'Vermelho, verde e dourado festivo', icon: '🎄' },
+  { value: 'new_year', label: 'Ano Novo', description: 'Fundo escuro com detalhes dourados', icon: '🎆' },
+  { value: 'easter', label: 'Páscoa', description: 'Cores pastéis suaves e delicadas', icon: '🐰' },
+  { value: 'carnaval', label: 'Carnaval', description: 'Cores vibrantes e alegres', icon: '🎭' },
 ];
 
 const scheduleThemes = themeOptions.filter((t) => t.value !== 'default');
+
+// Color preview component
+function ColorPreview({ colors, isDark = false }: { colors: typeof themeColors.default; isDark?: boolean }) {
+  return (
+    <div className="flex gap-1.5 mt-2">
+      <div
+        className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+        style={{ backgroundColor: colors.primary }}
+        title="Cor primária"
+      />
+      <div
+        className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+        style={{ backgroundColor: colors.secondary }}
+        title="Cor secundária"
+      />
+      <div
+        className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+        style={{ backgroundColor: colors.accent }}
+        title="Cor de destaque"
+      />
+      <div
+        className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+        style={{ backgroundColor: colors.bg }}
+        title="Cor de fundo"
+      />
+    </div>
+  );
+}
+
+// Mini theme preview card
+function ThemePreviewCard({ themeKey, isActive }: { themeKey: SeasonalTheme; isActive: boolean }) {
+  const colors = themeColors[themeKey];
+  const isDark = themeKey === 'new_year';
+
+  return (
+    <div
+      className={cn(
+        'relative w-full h-16 rounded-lg overflow-hidden border-2 transition-all',
+        isActive ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+      )}
+      style={{ backgroundColor: colors.bg }}
+    >
+      {/* Header bar */}
+      <div
+        className="h-4 w-full"
+        style={{ backgroundColor: colors.primary }}
+      />
+      {/* Content preview */}
+      <div className="p-2 flex gap-2">
+        <div
+          className="w-8 h-6 rounded"
+          style={{ backgroundColor: colors.secondary, opacity: 0.8 }}
+        />
+        <div className="flex-1 space-y-1">
+          <div
+            className="h-2 rounded w-3/4"
+            style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)' }}
+          />
+          <div
+            className="h-2 rounded w-1/2"
+            style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)' }}
+          />
+        </div>
+        <div
+          className="w-4 h-4 rounded-full"
+          style={{ backgroundColor: colors.accent }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // Convert MM-DD to readable date format
 function formatScheduleDate(dateStr: string): string {
@@ -119,7 +224,44 @@ export default function AdminSeasonalTheme() {
         </div>
       )}
 
-      {/* Card 1: Tema atual do site */}
+      {/* Card 1: Preview visual dos temas */}
+      <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
+        <h3 className="font-heading font-semibold mb-4 flex items-center gap-2">
+          <Palette className="h-5 w-5 text-primary" />
+          Paleta de Cores dos Temas
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Visualize as cores de cada tema disponível. O tema ativo está destacado.
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {themeOptions.map((option) => (
+            <div
+              key={option.value}
+              className={cn(
+                'p-3 rounded-lg border-2 transition-all',
+                activeTheme === option.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/30'
+              )}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{option.icon}</span>
+                <span className="text-sm font-medium">{option.label}</span>
+                {activeTheme === option.value && (
+                  <Badge variant="default" className="text-[10px] px-1.5 py-0">
+                    Ativo
+                  </Badge>
+                )}
+              </div>
+              <ThemePreviewCard themeKey={option.value} isActive={activeTheme === option.value} />
+              <ColorPreview colors={themeColors[option.value]} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Card 2: Tema manual do site */}
       <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
         <h3 className="font-heading font-semibold mb-4 flex items-center gap-2">
           <Palette className="h-5 w-5 text-primary" />
@@ -154,13 +296,14 @@ export default function AdminSeasonalTheme() {
                   <span className="font-medium">{option.label}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                <ColorPreview colors={themeColors[option.value]} />
               </div>
             </Label>
           ))}
         </RadioGroup>
       </div>
 
-      {/* Card 2: Agendamento Automático */}
+      {/* Card 3: Agendamento Automático */}
       <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading font-semibold flex items-center gap-2">
@@ -189,6 +332,7 @@ export default function AdminSeasonalTheme() {
             if (!schedule) return null;
 
             const isActive = isScheduleActive(schedule);
+            const colors = themeColors[themeOpt.value];
 
             return (
               <div
@@ -204,7 +348,7 @@ export default function AdminSeasonalTheme() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   {/* Theme info and toggle */}
-                  <div className="flex items-center gap-3 min-w-[140px]">
+                  <div className="flex items-center gap-3 min-w-[180px]">
                     <Switch
                       id={`schedule-${themeOpt.value}`}
                       checked={schedule.enabled}
@@ -220,6 +364,22 @@ export default function AdminSeasonalTheme() {
                         Ativo
                       </Badge>
                     )}
+                  </div>
+
+                  {/* Color preview mini */}
+                  <div className="flex gap-1">
+                    <div
+                      className="w-4 h-4 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: colors.primary }}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: colors.secondary }}
+                    />
+                    <div
+                      className="w-4 h-4 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: colors.accent }}
+                    />
                   </div>
 
                   {/* Date inputs */}
@@ -265,7 +425,7 @@ export default function AdminSeasonalTheme() {
         </div>
       </div>
 
-      {/* Card 3: Elementos decorativos extras */}
+      {/* Card 4: Elementos decorativos extras */}
       <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
         <h3 className="font-heading font-semibold mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />

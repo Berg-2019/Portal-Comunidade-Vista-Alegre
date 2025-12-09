@@ -8,7 +8,8 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
-
+import fs from 'fs';
+import path from 'path';
 export interface BotStatus {
   connected: boolean;
   connecting: boolean;
@@ -185,6 +186,50 @@ export class WhatsAppBot {
     this.phoneNumber = null;
     this.startTime = null;
     console.log('✅ Bot desconectado');
+  }
+
+  async clearSession(): Promise<void> {
+    console.log('🗑️ Limpando sessão do bot...');
+    this.shouldReconnect = false;
+    
+    // Desconecta se estiver conectado
+    if (this.sock) {
+      try {
+        await this.sock.logout();
+      } catch (error) {
+        console.log('Aviso ao desconectar durante limpeza:', error);
+      }
+      this.sock = null;
+    }
+    
+    // Remove a pasta auth_info
+    const authPath = path.join(process.cwd(), 'auth_info');
+    if (fs.existsSync(authPath)) {
+      fs.rmSync(authPath, { recursive: true, force: true });
+      console.log('✅ Pasta auth_info removida');
+    }
+    
+    // Reset do estado
+    this.connected = false;
+    this.connecting = false;
+    this.qrCode = null;
+    this.phoneNumber = null;
+    this.startTime = null;
+    this.lastConnected = null;
+    
+    // Reset das métricas
+    this.metrics = {
+      messagesReceived: 0,
+      messagesSent: 0,
+      reservationsProcessed: 0,
+      occurrencesProcessed: 0,
+      packagesQueried: 0,
+      averageResponseTime: 0,
+      errors: 0
+    };
+    this.responseTimes = [];
+    
+    console.log('✅ Sessão limpa com sucesso. Um novo QR será gerado ao conectar.');
   }
 
   getStatus(): BotStatus {

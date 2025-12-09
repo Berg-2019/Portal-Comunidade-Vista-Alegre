@@ -5,6 +5,17 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { botApi, BotStatus, BotMetrics } from '@/services/botApi';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   MessageCircle, 
   Power, 
@@ -13,9 +24,6 @@ import {
   RefreshCw, 
   Activity,
   Clock,
-  MessageSquare,
-  AlertTriangle,
-  CheckCircle2,
   Loader2,
   Phone,
   Wifi,
@@ -26,7 +34,9 @@ import {
   Inbox,
   Package,
   AlertCircle,
-  XCircle
+  XCircle,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 
 const BOT_API_URL = import.meta.env.VITE_BOT_API_URL || 'http://localhost:3002';
@@ -39,6 +49,7 @@ export function AdminBotManager() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [clearingSession, setClearingSession] = useState(false);
   const [latency, setLatency] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isApiReachable, setIsApiReachable] = useState(true);
@@ -140,6 +151,27 @@ export function AdminBotManager() {
       });
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const handleClearSession = async () => {
+    setClearingSession(true);
+    try {
+      await botApi.clearSession();
+      toast({
+        title: 'Sessão limpa',
+        description: 'Clique em Conectar para gerar um novo QR Code.',
+      });
+      fetchStatus();
+    } catch (error: any) {
+      console.error('[Bot Debug] Erro ao limpar sessão:', error);
+      toast({
+        title: 'Erro ao limpar sessão',
+        description: error.message || 'Não foi possível limpar a sessão',
+        variant: 'destructive',
+      });
+    } finally {
+      setClearingSession(false);
     }
   };
 
@@ -358,35 +390,83 @@ export function AdminBotManager() {
                 <Separator />
 
                 {/* Action Buttons */}
-                <div className="flex gap-3">
-                  {!status?.connected ? (
-                    <Button 
-                      onClick={handleConnect} 
-                      disabled={connecting || status?.connecting}
-                      className="flex-1"
-                    >
-                      {connecting || status?.connecting ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Power className="h-4 w-4 mr-2" />
-                      )}
-                      Conectar
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="destructive" 
-                      onClick={handleDisconnect}
-                      disabled={disconnecting}
-                      className="flex-1"
-                    >
-                      {disconnecting ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <PowerOff className="h-4 w-4 mr-2" />
-                      )}
-                      Desconectar
-                    </Button>
-                  )}
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    {!status?.connected ? (
+                      <Button 
+                        onClick={handleConnect} 
+                        disabled={connecting || status?.connecting}
+                        className="flex-1"
+                      >
+                        {connecting || status?.connecting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Power className="h-4 w-4 mr-2" />
+                        )}
+                        Conectar
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="destructive" 
+                        onClick={handleDisconnect}
+                        disabled={disconnecting}
+                        className="flex-1"
+                      >
+                        {disconnecting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <PowerOff className="h-4 w-4 mr-2" />
+                        )}
+                        Desconectar
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Clear Session Button */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
+                        disabled={clearingSession}
+                      >
+                        {clearingSession ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Limpar Sessão
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Limpar Sessão do WhatsApp?</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                          <p>
+                            Esta ação irá:
+                          </p>
+                          <ul className="list-disc pl-4 space-y-1 text-sm">
+                            <li>Desconectar o dispositivo atual</li>
+                            <li>Apagar todas as credenciais salvas</li>
+                            <li>Resetar as métricas do bot</li>
+                            <li>Exigir novo escaneamento de QR Code</li>
+                          </ul>
+                          <p className="text-orange-600 dark:text-orange-400 font-medium mt-3">
+                            Use esta opção se a conexão estiver corrompida ou se deseja conectar outro número.
+                          </p>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleClearSession}
+                          className="bg-orange-600 hover:bg-orange-700"
+                        >
+                          Limpar Sessão
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
@@ -450,17 +530,20 @@ export function AdminBotManager() {
                       <span className="text-sm">Tempo Médio</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {metrics?.averageResponseTime ? `${Math.round(metrics.averageResponseTime)}ms` : '--'}
+                      {metrics?.averageResponseTime 
+                        ? `${Math.round(metrics.averageResponseTime)}ms` 
+                        : '--'}
                     </p>
                   </div>
                 </div>
 
+                {/* Error count */}
                 {metrics && metrics.errors > 0 && (
-                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-red-500" />
-                    <span className="text-sm text-red-700 dark:text-red-400">
-                      {metrics.errors} erro(s) registrado(s)
-                    </span>
+                  <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Erros: {metrics.errors}</span>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -470,40 +553,38 @@ export function AdminBotManager() {
           {/* Bot Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Funcionalidades do Bot
-              </CardTitle>
+              <CardTitle>Informações do Bot</CardTitle>
+              <CardDescription>
+                Funcionalidades disponíveis via WhatsApp
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <h4 className="font-semibold">Reserva de Quadras</h4>
-                  </div>
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-medium flex items-center gap-2 mb-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    Reservas de Quadras
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Usuários podem reservar horários nas quadras esportivas diretamente pelo WhatsApp.
+                    Usuários podem consultar horários disponíveis e fazer reservas de quadras esportivas.
                   </p>
                 </div>
-
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    <h4 className="font-semibold">Reportar Ocorrências</h4>
-                  </div>
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-medium flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-primary" />
+                    Ocorrências
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Moradores podem reportar problemas no distrito para triagem e publicação.
+                    Moradores podem reportar problemas no bairro que serão triados pela administração.
                   </p>
                 </div>
-
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="h-5 w-5 text-primary" />
-                    <h4 className="font-semibold">Consultar Encomendas</h4>
-                  </div>
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-medium flex items-center gap-2 mb-2">
+                    <Package className="h-4 w-4 text-primary" />
+                    Encomendas
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Consulta rápida de encomendas disponíveis para retirada no correio.
+                    Consulta de encomendas disponíveis para retirada pelo nome do destinatário.
                   </p>
                 </div>
               </div>

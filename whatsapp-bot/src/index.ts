@@ -43,6 +43,16 @@ app.post('/api/bot/disconnect', async (req, res) => {
   }
 });
 
+// Clear session (force new QR)
+app.post('/api/bot/clear-session', async (req, res) => {
+  try {
+    await bot.clearSession();
+    res.json({ success: true, message: 'Sessão limpa. Clique em Conectar para gerar novo QR.' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get QR Code
 app.get('/api/bot/qr', (req, res) => {
   const qr = bot.getQRCode();

@@ -68,6 +68,10 @@ class BotApiService {
   async healthCheck(): Promise<{ status: string; service: string }> {
     return this.request('/api/health');
   }
+
+  async clearSession(): Promise<{ success: boolean; message: string }> {
+    return this.request('/api/bot/clear-session', { method: 'POST' });
+  }
 }
 
 export const botApi = new BotApiService();

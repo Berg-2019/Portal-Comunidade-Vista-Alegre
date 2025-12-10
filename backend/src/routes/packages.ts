@@ -7,13 +7,18 @@ import fs from 'fs';
 
 // Import pdf-parse with dynamic import for better compatibility
 let pdfParse: any = null;
+
 (async () => {
   try {
-    pdfParse = (await import('pdf-parse')).default;
+    const mod = await import('pdf-parse');
+    pdfParse = (mod as any).default || mod;
+    console.log('pdf-parse carregado, tipo:', typeof pdfParse);
   } catch (e) {
-    console.warn('pdf-parse not available, PDF extraction will be disabled');
+    console.warn('pdf-parse not available, PDF extraction will be disabled', e);
   }
 })();
+
+
 
 const router = Router();
 

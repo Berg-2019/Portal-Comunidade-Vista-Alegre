@@ -24,6 +24,7 @@ import {
   MessageCircle,
   Bot,
   Loader2,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,11 +39,13 @@ import AdminUsersManager from "@/components/admin/AdminUsersManager";
 import AdminBusinessManager from "@/components/admin/AdminBusinessManager";
 import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
 import { AdminBotManager } from "@/components/admin/AdminBotManager";
+import { AdminPackagePDFUpload } from "@/components/admin/AdminPackagePDFUpload";
+import { AdminColorEditor } from "@/components/admin/AdminColorEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/services/api";
 
 type PackageStatus = "aguardando" | "entregue" | "devolvido";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios" | "cores";
 
 interface PackageItem {
   id: string | number;
@@ -69,6 +72,7 @@ const navItems = [
   { id: "whatsapp" as ActiveTab, label: "Grupos WhatsApp", icon: MessageCircle },
   { id: "bot" as ActiveTab, label: "Bot WhatsApp", icon: Bot },
   { id: "pagina" as ActiveTab, label: "Página", icon: Settings, divider: true },
+  { id: "cores" as ActiveTab, label: "Cores do Site", icon: Palette },
   { id: "usuarios" as ActiveTab, label: "Usuários", icon: Shield },
 ];
 
@@ -78,6 +82,7 @@ export default function AdminDashboard() {
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pdfUploadOpen, setPdfUploadOpen] = useState(false);
   const { toast } = useToast();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -144,10 +149,11 @@ export default function AdminDashboard() {
   };
 
   const handleUpload = () => {
-    toast({
-      title: "Upload de PDF",
-      description: "Funcionalidade de upload será implementada com backend.",
-    });
+    setPdfUploadOpen(true);
+  };
+
+  const handlePdfImportSuccess = () => {
+    loadPackages();
   };
 
   const getTabTitle = () => {
@@ -170,6 +176,8 @@ export default function AdminDashboard() {
         return "Bot WhatsApp";
       case "pagina":
         return "Configurações da Página";
+      case "cores":
+        return "Cores do Site";
       case "usuarios":
         return "Gerenciar Usuários";
       default:
@@ -500,9 +508,19 @@ export default function AdminDashboard() {
           {/* Bot WhatsApp Tab */}
           {activeTab === "bot" && <AdminBotManager />}
 
+          {/* Cores Tab */}
+          {activeTab === "cores" && <AdminColorEditor />}
+
           {/* Usuários Tab */}
           {activeTab === "usuarios" && <AdminUsersManager />}
         </div>
+
+        {/* PDF Upload Modal */}
+        <AdminPackagePDFUpload
+          open={pdfUploadOpen}
+          onOpenChange={setPdfUploadOpen}
+          onImportSuccess={handlePdfImportSuccess}
+        />
       </main>
     </div>
   );

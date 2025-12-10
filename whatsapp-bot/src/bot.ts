@@ -46,7 +46,12 @@ export class WhatsAppBot {
   private lastConnected: Date | null = null;
   private startTime: Date | null = null;
   private messageHandler: MessageHandler | null = null;
-  private shouldReconnect: boolean = false; // Controle de reconexão manual
+  private shouldReconnect: boolean = false;
+  
+  // Reconnection control
+  private reconnectAttempts: number = 0;
+  private readonly MAX_RECONNECT_ATTEMPTS = 3;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
 
   // Metrics
   private metrics: BotMetrics = {
@@ -108,21 +113,43 @@ export class WhatsAppBot {
           this.connecting = false;
           
           const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
-          console.log('🔌 Conexão fechada. Código:', reason);
+          const errorMessage = (lastDisconnect?.error as Error)?.message || '';
+          console.log('🔌 Conexão fechada. Código:', reason, 'Mensagem:', errorMessage);
+
+          // Clear any pending reconnect timeout
+          if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+          }
 
           if (reason === DisconnectReason.loggedOut) {
             console.log('❌ Bot deslogado pelo usuário');
             this.qrCode = null;
             this.shouldReconnect = false;
-          } else if (reason === DisconnectReason.restartRequired) {
-            console.log('🔄 Restart necessário');
-            if (this.shouldReconnect && handler) {
-              setTimeout(() => this.connect(handler), 3000);
+            this.reconnectAttempts = 0;
+          } else if (reason === 401 || errorMessage.includes('auth') || errorMessage.includes('decrypt')) {
+            // Auth corruption detected - auto clean session
+            console.log('🔒 Erro de autenticação detectado. Limpando sessão automaticamente...');
+            this.shouldReconnect = false;
+            this.reconnectAttempts = 0;
+            const authPath = path.join(process.cwd(), 'auth_info');
+            if (fs.existsSync(authPath)) {
+              fs.rmSync(authPath, { recursive: true, force: true });
+              console.log('✅ Sessão corrompida removida. Reinicie a conexão para gerar novo QR.');
             }
           } else if (this.shouldReconnect && handler) {
-            // Só reconecta se shouldReconnect está ativo
-            console.log('🔄 Tentando reconectar em 5 segundos...');
-            setTimeout(() => this.connect(handler), 5000);
+            this.reconnectAttempts++;
+            
+            if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+              console.log(`❌ Limite de ${this.MAX_RECONNECT_ATTEMPTS} tentativas de reconexão atingido. Parando.`);
+              this.shouldReconnect = false;
+              this.reconnectAttempts = 0;
+              this.qrCode = null;
+            } else {
+              const delay = Math.min(5000 * this.reconnectAttempts, 15000);
+              console.log(`🔄 Tentativa ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS}. Reconectando em ${delay/1000}s...`);
+              this.reconnectTimeout = setTimeout(() => this.connect(handler), delay);
+            }
           } else {
             console.log('⏹️ Reconexão automática desabilitada');
           }
@@ -130,10 +157,11 @@ export class WhatsAppBot {
           console.log('✅ Bot conectado com sucesso!');
           this.connected = true;
           this.connecting = false;
-          this.qrCode = null; // Limpa QR após conectar
+          this.qrCode = null;
           this.lastConnected = new Date();
           this.startTime = new Date();
           this.phoneNumber = this.sock?.user?.id?.split(':')[0] || null;
+          this.reconnectAttempts = 0; // Reset on successful connection
           console.log('📞 Número conectado:', this.phoneNumber);
         }
       });
@@ -174,7 +202,14 @@ export class WhatsAppBot {
 
   async disconnect(): Promise<void> {
     console.log('🔌 Desconectando bot...');
-    this.shouldReconnect = false; // Desabilita reconexão automática
+    this.shouldReconnect = false;
+    this.reconnectAttempts = 0;
+
+    // Clear reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
 
     if (this.sock) {
       try {
@@ -194,51 +229,57 @@ export class WhatsAppBot {
   }
 
   async clearSession(): Promise<void> {
-  console.log('🗑️ Limpando sessão do bot...');
-  this.shouldReconnect = false;
+    console.log('🗑️ Limpando sessão do bot...');
+    this.shouldReconnect = false;
+    this.reconnectAttempts = 0;
 
-  if (this.sock) {
-    try {
-      await this.sock.logout();      // garante fechamento
-    } catch (error) {
-      console.log('Aviso ao desconectar durante limpeza:', error);
+    // Clear reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
-    this.sock = null;
-  }
 
-  // espera um pouco para o FS liberar arquivos
-  await new Promise(r => setTimeout(r, 500));
-
-  const authPath = path.join(process.cwd(), 'auth_info');
-  if (fs.existsSync(authPath)) {
-    try {
-      await fs.promises.rm(authPath, { recursive: true, force: true });
-      console.log('✅ Pasta auth_info removida');
-    } catch (err: any) {
-      console.error('Erro ao remover auth_info:', err);
-      // se quiser, apenas loga e não quebra a API
+    if (this.sock) {
+      try {
+        await this.sock.logout();
+      } catch (error) {
+        console.log('Aviso ao desconectar durante limpeza:', error);
+      }
+      this.sock = null;
     }
+
+    // Wait for FS to release files
+    await new Promise(r => setTimeout(r, 500));
+
+    const authPath = path.join(process.cwd(), 'auth_info');
+    if (fs.existsSync(authPath)) {
+      try {
+        await fs.promises.rm(authPath, { recursive: true, force: true });
+        console.log('✅ Pasta auth_info removida');
+      } catch (err: any) {
+        console.error('Erro ao remover auth_info:', err);
+      }
+    }
+
+    this.connected = false;
+    this.connecting = false;
+    this.qrCode = null;
+    this.phoneNumber = null;
+    this.startTime = null;
+    this.lastConnected = null;
+    this.metrics = {
+      messagesReceived: 0,
+      messagesSent: 0,
+      reservationsProcessed: 0,
+      occurrencesProcessed: 0,
+      packagesQueried: 0,
+      averageResponseTime: 0,
+      errors: 0
+    };
+    this.responseTimes = [];
+
+    console.log('✅ Sessão limpa. Clique em Conectar para gerar novo QR.');
   }
-
-  this.connected = false;
-  this.connecting = false;
-  this.qrCode = null;
-  this.phoneNumber = null;
-  this.startTime = null;
-  this.lastConnected = null;
-  this.metrics = {
-    messagesReceived: 0,
-    messagesSent: 0,
-    reservationsProcessed: 0,
-    occurrencesProcessed: 0,
-    packagesQueried: 0,
-    averageResponseTime: 0,
-    errors: 0
-  };
-  this.responseTimes = [];
-
-  console.log('✅ Sessão limpa (ou tentativa concluída).');
-}
 
 
   getStatus(): BotStatus {

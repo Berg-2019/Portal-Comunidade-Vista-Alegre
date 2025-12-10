@@ -197,9 +197,16 @@ class ApiService {
   }
 
   async uploadPackagePdf(formData: FormData) {
-    return this.request<{ success: boolean; results: any }>('/api/packages/upload-pdf', {
+    return this.request<{ success: boolean; results: { packages: any[]; filename: string } }>('/api/packages/upload-pdf', {
       method: 'POST',
       body: formData,
+    });
+  }
+
+  async confirmPackageImport(packages: { recipient_name: string; tracking_code: string; arrival_date: string }[], pdfFilename: string) {
+    return this.request<{ success: boolean; imported: number; duplicates: number }>('/api/packages/confirm-import', {
+      method: 'POST',
+      body: JSON.stringify({ packages, pdf_filename: pdfFilename }),
     });
   }
 

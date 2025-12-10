@@ -5,15 +5,23 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// Import pdf-parse with dynamic import for better compatibility
-let pdfParse: any = null;
-(async () => {
+// Carregador sob demanda do pdf-parse para melhor compatibilidade
+let pdfParser: any = null;
+
+async function loadPdfParser(): Promise<any> {
+  if (pdfParser) return pdfParser;
+  
   try {
-    pdfParse = (await import('pdf-parse')).default;
-  } catch (e) {
-    console.warn('pdf-parse not available, PDF extraction will be disabled');
+    const module = await import('pdf-parse');
+    // pdf-parse exporta a função diretamente, não como .default
+    pdfParser = typeof module === 'function' ? module : (module.default || module);
+    console.log('✅ pdf-parse carregado com sucesso');
+    return pdfParser;
+  } catch (error) {
+    console.error('❌ Erro ao carregar pdf-parse:', error);
+    return null;
   }
-})();
+}
 
 const router = Router();
 
@@ -233,17 +241,25 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: 
     let extractedPackages: ExtractedPackage[] = [];
     let autoExtracted = false;
 
-    // Try to extract data automatically using pdf-parse
-    if (pdfParse) {
+    // Carregar pdf-parse sob demanda
+    const parser = await loadPdfParser();
+    
+    if (parser) {
       try {
         const pdfBuffer = fs.readFileSync(req.file.path);
-        const pdfData = await pdfParse(pdfBuffer);
+        console.log('📄 Lendo PDF, tamanho:', pdfBuffer.length, 'bytes');
+        
+        const pdfData = await parser(pdfBuffer);
+        console.log('📄 Texto extraído (primeiros 500 chars):', pdfData.text.substring(0, 500));
+        
         extractedPackages = extractPackagesFromText(pdfData.text);
-        autoExtracted = true;
-        console.log(`Extracted ${extractedPackages.length} packages from PDF`);
+        autoExtracted = extractedPackages.length > 0;
+        console.log(`📦 ${extractedPackages.length} encomenda(s) extraída(s) do PDF`);
       } catch (parseError) {
-        console.error('Error parsing PDF:', parseError);
+        console.error('❌ Erro ao parsear PDF:', parseError);
       }
+    } else {
+      console.warn('⚠️ pdf-parse não disponível');
     }
 
     // If no automatic extraction, try to use manual data if provided
@@ -257,9 +273,11 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: 
 
     res.json({
       success: true,
-      filename: req.file.filename,
-      autoExtracted,
-      preview: extractedPackages,
+      results: {
+        packages: extractedPackages,
+        filename: req.file.filename,
+        autoExtracted
+      },
       message: autoExtracted 
         ? `${extractedPackages.length} encomenda(s) extraída(s) automaticamente. Revise os dados antes de confirmar.`
         : 'Não foi possível extrair dados automaticamente. Adicione manualmente ou tente outro PDF.'

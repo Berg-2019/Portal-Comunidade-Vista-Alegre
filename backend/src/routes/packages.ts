@@ -14,24 +14,31 @@ async function loadPdfParser(): Promise<any> {
   try {
     const module: any = await import('pdf-parse');
     
-    // Debug: ver estrutura do módulo
     console.log('🔍 pdf-parse module keys:', Object.keys(module));
-    console.log('🔍 typeof module.default:', typeof module.default);
     
-    // Tratamento para duplo default (CommonJS + esModuleInterop + dynamic import)
-    if (typeof module === 'function') {
-      pdfParser = module;
-    } else if (typeof module.default === 'function') {
-      pdfParser = module.default;
-    } else if (module.default && typeof module.default.default === 'function') {
-      // Duplo default: acontece com esModuleInterop + dynamic import em alguns builds
-      pdfParser = module.default.default;
-    } else {
-      // Fallback: tentar usar o próprio módulo
-      pdfParser = module;
+    // pdf-parse v2.x: PDFParse é uma classe que precisa ser instanciada
+    if (module.PDFParse && typeof module.PDFParse === 'function') {
+      const instance = new module.PDFParse();
+      // Wrapper para compatibilidade: retorna função que chama loadPDF
+      pdfParser = (buffer: Buffer) => instance.loadPDF(buffer);
+      console.log('✅ pdf-parse v2.x carregado (classe PDFParse)');
+      return pdfParser;
     }
     
-    console.log('✅ pdf-parse carregado, tipo:', typeof pdfParser);
+    // pdf-parse v1.x fallbacks
+    if (typeof module === 'function') {
+      pdfParser = module;
+      console.log('✅ pdf-parse v1.x carregado (module direto)');
+    } else if (typeof module.default === 'function') {
+      pdfParser = module.default;
+      console.log('✅ pdf-parse v1.x carregado (module.default)');
+    } else if (module.default && typeof module.default.default === 'function') {
+      pdfParser = module.default.default;
+      console.log('✅ pdf-parse v1.x carregado (module.default.default)');
+    } else {
+      throw new Error('Formato do módulo pdf-parse não reconhecido');
+    }
+    
     return pdfParser;
   } catch (error) {
     console.error('❌ Erro ao carregar pdf-parse:', error);

@@ -258,7 +258,7 @@ export default function AdminNewsManager() {
                   <td className="px-6 py-4 text-center">
                     <span className={cn(
                       "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium",
-                      item.published ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"
+                      item.published ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
                     )}>
                       {item.published ? <><Eye className="h-3.5 w-3.5" />Publicado</> : <><EyeOff className="h-3.5 w-3.5" />Rascunho</>}
                     </span>

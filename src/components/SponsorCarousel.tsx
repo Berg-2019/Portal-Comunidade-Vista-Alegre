@@ -150,7 +150,7 @@ export default function SponsorCarousel() {
                             href={`https://wa.me/${sponsor.whatsapp}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-green-600 hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-success hover:underline"
                           >
                             <MessageCircle className="h-3.5 w-3.5" />
                             WhatsApp

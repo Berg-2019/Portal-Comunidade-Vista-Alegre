@@ -280,8 +280,8 @@ export default function AdminScheduleManager() {
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+            <div className="p-2 rounded-lg bg-success/10">
+              <CheckCircle className="h-5 w-5 text-success" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Ativos</p>
@@ -293,8 +293,8 @@ export default function AdminScheduleManager() {
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10">
-              <Users className="h-5 w-5 text-blue-500" />
+            <div className="p-2 rounded-lg bg-info/10">
+              <Users className="h-5 w-5 text-info" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Escolinhas</p>
@@ -306,8 +306,8 @@ export default function AdminScheduleManager() {
         </div>
         <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-500/10">
-              <Users className="h-5 w-5 text-orange-500" />
+            <div className="p-2 rounded-lg bg-warning/10">
+              <Users className="h-5 w-5 text-warning" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Projetos</p>
@@ -352,7 +352,7 @@ export default function AdminScheduleManager() {
                             className={cn(
                               "px-2 py-0.5 rounded-full text-xs font-medium",
                               schedule.active
-                                ? "bg-green-500/10 text-green-500"
+                                ? "bg-success/10 text-success"
                                 : "bg-muted text-muted-foreground"
                             )}
                           >
@@ -394,7 +394,7 @@ export default function AdminScheduleManager() {
                           {schedule.active ? (
                             <XCircle className="h-4 w-4 text-destructive" />
                           ) : (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <CheckCircle className="h-4 w-4 text-success" />
                           )}
                         </Button>
                         <Button

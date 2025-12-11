@@ -260,9 +260,9 @@ export function AdminBotManager() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {status?.connected ? (
-                      <Wifi className="h-5 w-5 text-green-500" />
+                      <Wifi className="h-5 w-5 text-success" />
                     ) : (
-                      <WifiOff className="h-5 w-5 text-red-500" />
+                      <WifiOff className="h-5 w-5 text-destructive" />
                     )}
                     <span className="font-medium">Status</span>
                   </div>
@@ -277,10 +277,10 @@ export function AdminBotManager() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-blue-500" />
+                    <Activity className="h-5 w-5 text-info" />
                     <span className="font-medium">Latência</span>
                   </div>
-                  <span className={`font-mono ${latency && latency > 500 ? 'text-yellow-500' : 'text-green-500'}`}>
+                  <span className={`font-mono ${latency && latency > 500 ? 'text-warning' : 'text-success'}`}>
                     {latency ? `${latency}ms` : '--'}
                   </span>
                 </div>
@@ -291,7 +291,7 @@ export function AdminBotManager() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-purple-500" />
+                    <Clock className="h-5 w-5 text-accent" />
                     <span className="font-medium">Uptime</span>
                   </div>
                   <span className="font-mono">
@@ -305,7 +305,7 @@ export function AdminBotManager() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-emerald-500" />
+                    <Phone className="h-5 w-5 text-success" />
                     <span className="font-medium">Número</span>
                   </div>
                   <span className="font-mono text-sm">
@@ -349,12 +349,12 @@ export function AdminBotManager() {
 
                 {/* Connected State */}
                 {status?.connected && (
-                  <div className="flex flex-col items-center p-8 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
-                    <h3 className="text-lg font-semibold text-green-700 dark:text-green-400">
+                  <div className="flex flex-col items-center p-8 bg-success/10 rounded-lg border border-success/30">
+                    <CheckCircle2 className="h-16 w-16 text-success mb-4" />
+                    <h3 className="text-lg font-semibold text-success">
                       Bot Conectado
                     </h3>
-                    <p className="text-sm text-green-600 dark:text-green-500">
+                    <p className="text-sm text-success/80">
                       {status.phoneNumber ? `+${status.phoneNumber}` : 'WhatsApp ativo'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
@@ -376,12 +376,12 @@ export function AdminBotManager() {
 
                 {/* Connecting State */}
                 {status?.connecting && !qrCode && (
-                  <div className="flex flex-col items-center p-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <Loader2 className="h-16 w-16 text-blue-500 animate-spin mb-4" />
-                    <h3 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                  <div className="flex flex-col items-center p-8 bg-info/10 rounded-lg border border-info/30">
+                    <Loader2 className="h-16 w-16 text-info animate-spin mb-4" />
+                    <h3 className="text-lg font-semibold text-info">
                       Conectando...
                     </h3>
-                    <p className="text-sm text-blue-600 dark:text-blue-500">
+                    <p className="text-sm text-info/80">
                       Aguarde o QR Code
                     </p>
                   </div>
@@ -427,7 +427,7 @@ export function AdminBotManager() {
                     <AlertDialogTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
+                        className="w-full border-warning/50 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/50 dark:text-warning dark:hover:bg-warning/10"
                         disabled={clearingSession}
                       >
                         {clearingSession ? (
@@ -451,7 +451,7 @@ export function AdminBotManager() {
                             <li>Resetar as métricas do bot</li>
                             <li>Exigir novo escaneamento de QR Code</li>
                           </ul>
-                          <p className="text-orange-600 dark:text-orange-400 font-medium mt-3">
+                          <p className="text-warning font-medium mt-3">
                             Use esta opção se a conexão estiver corrompida ou se deseja conectar outro número.
                           </p>
                         </AlertDialogDescription>
@@ -460,7 +460,7 @@ export function AdminBotManager() {
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleClearSession}
-                          className="bg-orange-600 hover:bg-orange-700"
+                          className="bg-warning text-warning-foreground hover:bg-warning/90"
                         >
                           Limpar Sessão
                         </AlertDialogAction>

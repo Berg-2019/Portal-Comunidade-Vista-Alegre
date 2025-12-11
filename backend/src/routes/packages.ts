@@ -13,9 +13,25 @@ async function loadPdfParser(): Promise<any> {
   
   try {
     const module = await import('pdf-parse');
-    // pdf-parse exporta a função diretamente, não como .default
-    pdfParser = typeof module === 'function' ? module : (module.default || module);
-    console.log('✅ pdf-parse carregado com sucesso');
+    
+    // Debug: ver estrutura do módulo
+    console.log('🔍 pdf-parse module keys:', Object.keys(module));
+    console.log('🔍 typeof module.default:', typeof module.default);
+    
+    // Tratamento para duplo default (CommonJS + esModuleInterop + dynamic import)
+    if (typeof module === 'function') {
+      pdfParser = module;
+    } else if (typeof module.default === 'function') {
+      pdfParser = module.default;
+    } else if (module.default && typeof module.default.default === 'function') {
+      // Duplo default: acontece com esModuleInterop + dynamic import em alguns builds
+      pdfParser = module.default.default;
+    } else {
+      // Fallback: tentar usar o próprio módulo
+      pdfParser = module;
+    }
+    
+    console.log('✅ pdf-parse carregado, tipo:', typeof pdfParser);
     return pdfParser;
   } catch (error) {
     console.error('❌ Erro ao carregar pdf-parse:', error);
@@ -54,7 +70,6 @@ const upload = multer({
 
 // PDF Extraction patterns - Brazilian tracking codes
 const TRACKING_CODE_REGEX = /[A-Z]{2}\d{9}[A-Z]{2}/g;
-const DATE_REGEX = /(\d{2}\/\d{2}\/\d{4})/g;
 
 interface ExtractedPackage {
   recipient_name: string;
@@ -67,6 +82,7 @@ interface ExtractedPackage {
 function sanitizeRecipientName(name: string): string {
   return name
     .replace(/[<>\"'&;]/g, '') // Remove potentially dangerous characters
+    .replace(/:\s*$/, '') // Remove trailing colon
     .trim()
     .substring(0, 100); // Limit length
 }
@@ -76,86 +92,92 @@ function isValidTrackingCode(code: string): boolean {
   return /^[A-Z]{2}\d{9}[A-Z]{2}$/.test(code);
 }
 
-// Extract packages from PDF text
+// Extract packages from PDF text - Formato LDI Correios
 function extractPackagesFromText(text: string): ExtractedPackage[] {
   const packages: ExtractedPackage[] = [];
   
-  // Find all tracking codes
-  const trackingCodes = text.match(TRACKING_CODE_REGEX) || [];
-  console.log(`🔍 Códigos de rastreio encontrados: ${trackingCodes.length}`, trackingCodes.slice(0, 5));
+  console.log('📄 Texto do PDF (primeiros 1000 chars):', text.substring(0, 1000));
   
-  // Find all dates
-  const dates = text.match(DATE_REGEX) || [];
+  // Extrair data de devolução do cabeçalho (usada como referência de data)
+  const returnDateMatch = text.match(/Data de Devolução:\s*(\d{2}\/\d{2}\/\d{4})/);
+  const returnDate = returnDateMatch ? returnDateMatch[1] : null;
+  console.log('📅 Data de Devolução encontrada:', returnDate);
   
-  // Find potential names (lines in uppercase with 3-50 chars)
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  const names: string[] = [];
+  // Extrair total esperado de objetos
+  const totalMatch = text.match(/Total de objetos:\s*(\d+)/);
+  const expectedTotal = totalMatch ? parseInt(totalMatch[1]) : 0;
+  console.log('📦 Total de objetos esperado:', expectedTotal);
   
-  for (const line of lines) {
-    // Check if line looks like a name (uppercase, reasonable length, no numbers)
-    if (/^[A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ][A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ\s]{2,50}$/.test(line) && 
-        !/\d/.test(line) &&
-        !line.includes('CORREIOS') &&
-        !line.includes('SEDEX') &&
-        !line.includes('PAC') &&
-        !line.includes('LISTA') &&
-        !line.includes('ENCOMENDA')) {
-      names.push(line);
-    }
-  }
+  // Padrão 1: Formato tabular LDI com colunas separadas por |
+  // | Grupo | Data | Posição | Objeto | Destinatário |
+  const tablePattern = /\|\s*\d+\s*\|\s*(\d{2}\/\d{2}\/\d{4})\s*\|\s*[A-Z]+-\s*\d+\s*\|\s*([A-Z]{2}\d{9}[A-Z]{2})\s*\|\s*([^|]+)\s*\|/g;
   
-  // Try to match tracking codes with names and dates
-  for (let i = 0; i < trackingCodes.length; i++) {
-    const trackingCode = trackingCodes[i];
+  let match;
+  while ((match = tablePattern.exec(text)) !== null) {
+    const [_, date, trackingCode, recipientRaw] = match;
     
-    // Validate tracking code
-    if (!isValidTrackingCode(trackingCode)) {
-      console.log(`⚠️ Código inválido ignorado: ${trackingCode}`);
-      continue;
+    // Limpar nome do destinatário (remover : e texto após, como endereço)
+    let recipient = recipientRaw.trim();
+    if (recipient.includes(':')) {
+      recipient = recipient.split(':')[0].trim();
     }
     
-    const codeIndex = text.indexOf(trackingCode);
-    
-    // Find the nearest name before this tracking code
-    let nearestName = '';
-    let nameDistance = Infinity;
-    
-    for (const name of names) {
-      const nameIndex = text.indexOf(name);
-      if (nameIndex < codeIndex && nameIndex !== -1) {
-        const distance = codeIndex - nameIndex;
-        if (distance < nameDistance) {
-          nameDistance = distance;
-          nearestName = name;
-        }
-      }
-    }
-    
-    // Use today's date if no date found near the code
-    let arrivalDate = new Date().toISOString().split('T')[0];
-    
-    // Try to find a date near the tracking code
-    for (const date of dates) {
-      const dateIndex = text.indexOf(date);
-      if (Math.abs(dateIndex - codeIndex) < 100) {
-        // Convert DD/MM/YYYY to YYYY-MM-DD
-        const [day, month, year] = date.split('/');
-        arrivalDate = `${year}-${month}-${day}`;
-        break;
-      }
-    }
-    
-    // Calculate confidence based on whether we found all fields
-    let confidence = 0.33; // Base confidence for having tracking code
-    if (nearestName) confidence += 0.33;
-    if (arrivalDate !== new Date().toISOString().split('T')[0]) confidence += 0.34;
+    // Converter data DD/MM/YYYY para YYYY-MM-DD
+    const [day, month, year] = date.split('/');
+    const arrivalDate = `${year}-${month}-${day}`;
     
     packages.push({
-      recipient_name: sanitizeRecipientName(nearestName || 'NOME NÃO IDENTIFICADO'),
+      recipient_name: sanitizeRecipientName(recipient),
       tracking_code: trackingCode,
       arrival_date: arrivalDate,
-      confidence: Math.round(confidence * 100)
+      confidence: 100 // Alta confiança para formato tabular
     });
+  }
+  
+  console.log(`📊 Padrão tabular: ${packages.length} encomendas encontradas`);
+  
+  // Padrão 2: Fallback - buscar tracking codes e tentar associar dados
+  if (packages.length === 0) {
+    console.log('⚠️ Padrão tabular não encontrou dados, tentando fallback...');
+    
+    const trackingCodes = text.match(TRACKING_CODE_REGEX) || [];
+    console.log(`🔍 Códigos de rastreio encontrados (fallback): ${trackingCodes.length}`);
+    
+    // Procurar por linhas que contenham data + código + nome
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    for (const code of trackingCodes) {
+      if (!isValidTrackingCode(code)) continue;
+      
+      // Encontrar a linha que contém este código
+      const lineWithCode = lines.find(line => line.includes(code));
+      
+      if (lineWithCode) {
+        // Tentar extrair data da mesma linha
+        const dateMatch = lineWithCode.match(/(\d{2}\/\d{2}\/\d{4})/);
+        let arrivalDate = new Date().toISOString().split('T')[0];
+        
+        if (dateMatch) {
+          const [day, month, year] = dateMatch[1].split('/');
+          arrivalDate = `${year}-${month}-${day}`;
+        }
+        
+        // Tentar extrair nome (texto após o código, antes de : ou fim da linha)
+        const afterCode = lineWithCode.split(code)[1] || '';
+        let recipient = afterCode.replace(/[|:].*/g, '').trim();
+        
+        if (!recipient || recipient.length < 2) {
+          recipient = 'NOME NÃO IDENTIFICADO';
+        }
+        
+        packages.push({
+          recipient_name: sanitizeRecipientName(recipient),
+          tracking_code: code,
+          arrival_date: arrivalDate,
+          confidence: 50 // Confiança média para fallback
+        });
+      }
+    }
   }
   
   // Remove duplicates by tracking code
@@ -163,6 +185,12 @@ function extractPackagesFromText(text: string): ExtractedPackage[] {
     index === self.findIndex(p => p.tracking_code === pkg.tracking_code)
   );
   
+  // Validar total extraído
+  if (expectedTotal > 0 && uniquePackages.length !== expectedTotal) {
+    console.log(`⚠️ Atenção: Extraído ${uniquePackages.length} de ${expectedTotal} esperados`);
+  }
+  
+  console.log(`✅ Total final: ${uniquePackages.length} encomendas extraídas`);
   return uniquePackages;
 }
 

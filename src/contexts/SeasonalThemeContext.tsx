@@ -10,6 +10,20 @@ export interface ThemeSchedule {
   enabled: boolean;
 }
 
+interface ColorConfig {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+  background?: string;
+  foreground?: string;
+  muted?: string;
+  success?: string;
+  warning?: string;
+  destructive?: string;
+  card?: string;
+  border?: string;
+}
+
 interface SeasonalThemeContextType {
   theme: SeasonalTheme;
   activeTheme: SeasonalTheme; // The theme actually being displayed (considering schedule)
@@ -72,6 +86,59 @@ function getScheduledTheme(schedules: ThemeSchedule[], fallbackTheme: SeasonalTh
   return fallbackTheme;
 }
 
+// Convert HEX to HSL string (without hsl() wrapper for CSS variables)
+function hexToHsl(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '0 0% 0%';
+
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Apply custom colors from settings to CSS variables
+function applyCustomColors(colors: ColorConfig) {
+  const root = document.documentElement;
+  
+  const cssVarMap: Record<keyof ColorConfig, string> = {
+    primary: '--primary',
+    secondary: '--secondary',
+    accent: '--accent',
+    background: '--background',
+    foreground: '--foreground',
+    muted: '--muted',
+    success: '--success',
+    warning: '--warning',
+    destructive: '--destructive',
+    card: '--card',
+    border: '--border',
+  };
+
+  Object.entries(colors).forEach(([key, value]) => {
+    if (value && cssVarMap[key as keyof ColorConfig]) {
+      const hslValue = hexToHsl(value);
+      root.style.setProperty(cssVarMap[key as keyof ColorConfig], hslValue);
+    }
+  });
+}
+
 export function SeasonalThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<SeasonalTheme>('default');
   const [snowEnabled, setSnowEnabled] = useState(false);
@@ -102,6 +169,16 @@ export function SeasonalThemeProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {
           console.error('Error parsing theme schedules:', e);
+        }
+      }
+
+      // Load and apply custom colors
+      if (settings.custom_colors) {
+        try {
+          const customColors = JSON.parse(settings.custom_colors);
+          applyCustomColors(customColors);
+        } catch (e) {
+          console.error('Error parsing custom colors:', e);
         }
       }
     } catch (error) {

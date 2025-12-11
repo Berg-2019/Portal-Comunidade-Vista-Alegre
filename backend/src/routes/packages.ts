@@ -5,18 +5,6 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-<<<<<<< HEAD
-// Import pdf-parse with dynamic import for better compatibility
-let pdfParse: any = null;
-
-(async () => {
-  try {
-    const mod = await import('pdf-parse');
-    pdfParse = (mod as any).default || mod;
-    console.log('pdf-parse carregado, tipo:', typeof pdfParse);
-  } catch (e) {
-    console.warn('pdf-parse not available, PDF extraction will be disabled', e);
-=======
 // Carregador sob demanda do pdf-parse para melhor compatibilidade
 let pdfParser: any = null;
 
@@ -32,11 +20,8 @@ async function loadPdfParser(): Promise<any> {
   } catch (error) {
     console.error('❌ Erro ao carregar pdf-parse:', error);
     return null;
->>>>>>> 943381ff21945e96d84a1190c665dea3790dee8a
   }
 }
-
-
 
 const router = Router();
 
@@ -67,10 +52,9 @@ const upload = multer({
   }
 });
 
-// PDF Extraction patterns
+// PDF Extraction patterns - Brazilian tracking codes
 const TRACKING_CODE_REGEX = /[A-Z]{2}\d{9}[A-Z]{2}/g;
 const DATE_REGEX = /(\d{2}\/\d{2}\/\d{4})/g;
-const NAME_REGEX = /^[A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ][A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ\s]{2,50}$/gm;
 
 interface ExtractedPackage {
   recipient_name: string;
@@ -79,12 +63,26 @@ interface ExtractedPackage {
   confidence: number;
 }
 
+// Sanitize recipient name
+function sanitizeRecipientName(name: string): string {
+  return name
+    .replace(/[<>\"'&;]/g, '') // Remove potentially dangerous characters
+    .trim()
+    .substring(0, 100); // Limit length
+}
+
+// Validate Brazilian tracking code format
+function isValidTrackingCode(code: string): boolean {
+  return /^[A-Z]{2}\d{9}[A-Z]{2}$/.test(code);
+}
+
 // Extract packages from PDF text
 function extractPackagesFromText(text: string): ExtractedPackage[] {
   const packages: ExtractedPackage[] = [];
   
   // Find all tracking codes
   const trackingCodes = text.match(TRACKING_CODE_REGEX) || [];
+  console.log(`🔍 Códigos de rastreio encontrados: ${trackingCodes.length}`, trackingCodes.slice(0, 5));
   
   // Find all dates
   const dates = text.match(DATE_REGEX) || [];
@@ -107,9 +105,15 @@ function extractPackagesFromText(text: string): ExtractedPackage[] {
   }
   
   // Try to match tracking codes with names and dates
-  // Strategy: For each tracking code, find the nearest name before it in the text
   for (let i = 0; i < trackingCodes.length; i++) {
     const trackingCode = trackingCodes[i];
+    
+    // Validate tracking code
+    if (!isValidTrackingCode(trackingCode)) {
+      console.log(`⚠️ Código inválido ignorado: ${trackingCode}`);
+      continue;
+    }
+    
     const codeIndex = text.indexOf(trackingCode);
     
     // Find the nearest name before this tracking code
@@ -147,7 +151,7 @@ function extractPackagesFromText(text: string): ExtractedPackage[] {
     if (arrivalDate !== new Date().toISOString().split('T')[0]) confidence += 0.34;
     
     packages.push({
-      recipient_name: nearestName || 'NOME NÃO IDENTIFICADO',
+      recipient_name: sanitizeRecipientName(nearestName || 'NOME NÃO IDENTIFICADO'),
       tracking_code: trackingCode,
       arrival_date: arrivalDate,
       confidence: Math.round(confidence * 100)
@@ -306,7 +310,9 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: 
 // Admin: Confirm import of extracted packages
 router.post('/confirm-import', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { packages: packagesToImport, pdfFilename } = req.body;
+    // Accept both pdfFilename and pdf_filename for compatibility
+    const { packages: packagesToImport, pdfFilename, pdf_filename } = req.body;
+    const filename = pdfFilename || pdf_filename;
 
     if (!packagesToImport || !Array.isArray(packagesToImport) || packagesToImport.length === 0) {
       res.status(400).json({ error: 'No packages to import' });
@@ -326,6 +332,13 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
         if (!pkg.recipient_name || !pkg.tracking_code) {
           results.errors++;
           results.details.push({ tracking_code: pkg.tracking_code || 'N/A', status: 'error', reason: 'Campos obrigatórios faltando' });
+          continue;
+        }
+
+        // Validate tracking code format
+        if (!isValidTrackingCode(pkg.tracking_code)) {
+          results.errors++;
+          results.details.push({ tracking_code: pkg.tracking_code, status: 'error', reason: 'Formato de código inválido' });
           continue;
         }
 
@@ -349,7 +362,7 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
         await query(
           `INSERT INTO packages (recipient_name, tracking_code, status, arrival_date, pickup_deadline, pdf_source)
            VALUES ($1, $2, 'aguardando', $3, $4, $5)`,
-          [pkg.recipient_name, pkg.tracking_code, arrivalDate.toISOString().split('T')[0], pickupDeadline, pdfFilename || null]
+          [sanitizeRecipientName(pkg.recipient_name), pkg.tracking_code, arrivalDate.toISOString().split('T')[0], pickupDeadline, filename || null]
         );
 
         results.imported++;
@@ -372,6 +385,12 @@ router.post('/', authenticateToken, async (req: Request, res: Response): Promise
   try {
     const { recipient_name, tracking_code, arrival_date, notes } = req.body;
 
+    // Validate tracking code
+    if (!isValidTrackingCode(tracking_code)) {
+      res.status(400).json({ error: 'Código de rastreio inválido. Use o formato: XX000000000XX' });
+      return;
+    }
+
     // Calculate pickup deadline (7 days from arrival)
     const arrivalDate = new Date(arrival_date);
     const pickupDeadline = new Date(arrivalDate);
@@ -381,7 +400,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response): Promise
       `INSERT INTO packages (recipient_name, tracking_code, status, arrival_date, pickup_deadline, notes)
        VALUES ($1, $2, 'aguardando', $3, $4, $5)
        RETURNING *`,
-      [recipient_name, tracking_code, arrival_date, pickupDeadline, notes]
+      [sanitizeRecipientName(recipient_name), tracking_code, arrival_date, pickupDeadline, notes]
     );
 
     res.json({ success: true, package: result.rows[0] });

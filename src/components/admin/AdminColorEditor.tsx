@@ -138,15 +138,25 @@ export function AdminColorEditor() {
     }
   };
 
+  // Validate HEX color format
+  const isValidHex = (hex: string): boolean => {
+    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex);
+  };
+
   const handleColorChange = (key: keyof ColorConfig, value: string) => {
+    // Always update state for input display
     setColors(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
     
-    // Apply color in real-time
-    applyColorToCSS(key, value);
+    // Only apply to CSS if valid HEX
+    if (isValidHex(value)) {
+      applyColorToCSS(key, value);
+    }
   };
 
   const applyColorToCSS = (key: keyof ColorConfig, hexValue: string) => {
+    if (!isValidHex(hexValue)) return;
+    
     const hslValue = hexToHsl(hexValue);
     const root = document.documentElement;
     
@@ -177,6 +187,17 @@ export function AdminColorEditor() {
   };
 
   const handleSave = async () => {
+    // Validate all colors before saving
+    const invalidColors = Object.entries(colors).filter(([_, value]) => !isValidHex(value));
+    if (invalidColors.length > 0) {
+      toast({
+        title: 'Cores inválidas',
+        description: `Corrija as cores: ${invalidColors.map(([key]) => colorLabels[key as keyof ColorConfig]).join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       await api.updateSettings({

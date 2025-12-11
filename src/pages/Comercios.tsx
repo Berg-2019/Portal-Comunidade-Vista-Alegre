@@ -203,7 +203,7 @@ export default function Comercios() {
                               href={`https://wa.me/${business.whatsapp}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-green-600 hover:underline"
+                              className="inline-flex items-center gap-1 text-success hover:underline"
                             >
                               <MessageCircle className="h-4 w-4" />
                               WhatsApp

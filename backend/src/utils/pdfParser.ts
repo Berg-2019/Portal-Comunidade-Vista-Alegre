@@ -126,9 +126,9 @@ export function cleanRecipientName(name: string): string {
   // VALIDATION: Minimum 3 characters
   if (cleaned.length < 3) return 'NOME NÃO IDENTIFICADO';
   
-  // VALIDATION: Minimum 2 words (for full names)
+  // VALIDATION: Minimum 2 words (for full names) - but allow single long word (compound name)
   const words = cleaned.split(' ').filter(w => w.length > 0);
-  if (words.length < 2) return 'NOME NÃO IDENTIFICADO';
+  if (words.length < 2 && cleaned.length < 8) return 'NOME NÃO IDENTIFICADO';
   
   // Convert to Title Case
   cleaned = words
@@ -457,11 +457,18 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
     logger.info('Parse', 'Tentando padrão alternativo (linha por linha)');
     
     const lines = text.split('\n').filter(l => l.trim().length > 0);
+    let debugCount = 0;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // Find tracking codes in line
       const codes = line.match(TRACKING_CODE_GLOBAL) || [];
+      
+      // DEBUG: Log first 5 lines with tracking codes
+      if (codes.length > 0 && debugCount < 5) {
+        debugCount++;
+        logger.info('Debug', `Linha ${i + 1}: "${line.substring(0, 200)}"`);
+      }
       
       for (const code of codes) {
         if (!isValidTrackingCode(code) || seenCodes.has(code)) continue;
@@ -480,12 +487,27 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
         // IMPROVED: Multi-strategy name extraction
         let recipient = 'NOME NÃO IDENTIFICADO';
         
-        // Strategy 1: Name after tracking code (most common in LDI format)
-        const afterCodeMatch = line.match(new RegExp(code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s]{3,50}?)(?:\\s*:|$|\\s+\\d)'));
+        // Strategy 1: Name after tracking code with improved lookahead (stops at : or | or next tracking code)
+        const afterCodeMatch = line.match(new RegExp(
+          code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s\\.\\-\\']{3,60}?)(?=\\s*:|\\s*\\||\\s+[A-Z]{2}\\d{9}[A-Z]{2}|$)'
+        ));
         if (afterCodeMatch && afterCodeMatch[1]) {
           const candidateName = cleanRecipientName(afterCodeMatch[1]);
           if (candidateName !== 'NOME NÃO IDENTIFICADO') {
             recipient = candidateName;
+          }
+        }
+        
+        // Strategy 1.5: Name after code with prepositions (de/da/dos/das/e)
+        if (recipient === 'NOME NÃO IDENTIFICADO') {
+          const improvedMatch = line.match(new RegExp(
+            code + '\\s+([A-ZÀ-Ú][a-zà-ú]+(?:\\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][a-zà-ú]+))+)(?=\\s*:|\\s*$|\\s*\\|)'
+          ));
+          if (improvedMatch && improvedMatch[1]) {
+            const candidateName = cleanRecipientName(improvedMatch[1]);
+            if (candidateName !== 'NOME NÃO IDENTIFICADO') {
+              recipient = candidateName;
+            }
           }
         }
         
@@ -518,6 +540,17 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
                 recipient = candidateName;
                 break;
               }
+            }
+          }
+        }
+        
+        // Strategy 4: Name BEFORE tracking code (alternative format)
+        if (recipient === 'NOME NÃO IDENTIFICADO') {
+          const beforeCodeMatch = line.match(/([A-ZÀ-Ú][a-zà-ú]+(?:\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][a-zà-ú]+))+)\s+[A-Z]{2}\d{9}[A-Z]{2}/);
+          if (beforeCodeMatch && beforeCodeMatch[1]) {
+            const candidateName = cleanRecipientName(beforeCodeMatch[1]);
+            if (candidateName !== 'NOME NÃO IDENTIFICADO') {
+              recipient = candidateName;
             }
           }
         }

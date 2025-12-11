@@ -466,7 +466,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
   }
 });
 
-// Admin: Clear PDF cache
+// Admin: Clear expired PDF cache
 router.post('/admin/clear-cache', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const cleaned = await cleanExpiredCache();
@@ -474,6 +474,19 @@ router.post('/admin/clear-cache', authenticateToken, async (req: Request, res: R
   } catch (error) {
     console.error('Error clearing cache:', error);
     res.status(500).json({ error: 'Error clearing cache' });
+  }
+});
+
+// Admin: Clear ALL PDF cache (force reprocessing)
+router.post('/admin/clear-all-cache', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query('DELETE FROM pdf_cache RETURNING id');
+    const deleted = result.rowCount || 0;
+    console.log(`🧹 Cache completo limpo: ${deleted} entradas removidas`);
+    res.json({ success: true, deleted });
+  } catch (error) {
+    console.error('Error clearing all cache:', error);
+    res.status(500).json({ error: 'Error clearing all cache' });
   }
 });
 

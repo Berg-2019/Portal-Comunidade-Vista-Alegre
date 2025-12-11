@@ -12,7 +12,7 @@ async function loadPdfParser(): Promise<any> {
   if (pdfParser) return pdfParser;
   
   try {
-    const module = await import('pdf-parse');
+    const module: any = await import('pdf-parse');
     
     // Debug: ver estrutura do módulo
     console.log('🔍 pdf-parse module keys:', Object.keys(module));

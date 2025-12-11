@@ -114,28 +114,36 @@ export function cleanRecipientName(name: string): string {
   let cleaned = name
     // Remove address after ":"
     .replace(/:.*$/, '')
+    // Remove RUA, AV, TRAVESSA, etc. (addresses)
+    .replace(/\s*(RUA|AV|AVENIDA|TRAVESSA|TV|ESTRADA|ROD|RODOVIA|BR|KM|Nº|N°|NUMERO|BAIRRO|SETOR|QUADRA|LOTE|CASA|APT|APARTAMENTO|BLOCO|CONDOMINIO|COND|CEP|CIDADE|ESTADO|UF)\s*.*/i, '')
     // Remove special characters except letters, spaces, dots, hyphens, apostrophes
-    .replace(/[^\\p{L}\s.\-']/gu, '')
+    // FIX: Removed extra backslash in regex (was \\p{L}, now \p{L})
+    .replace(/[^\p{L}\s.\-']/gu, '')
     // Remove multiple spaces
     .replace(/\s+/g, ' ')
     .trim();
   
+  // VALIDATION: Minimum 3 characters
+  if (cleaned.length < 3) return 'NOME NÃO IDENTIFICADO';
+  
+  // VALIDATION: Minimum 2 words (for full names)
+  const words = cleaned.split(' ').filter(w => w.length > 0);
+  if (words.length < 2) return 'NOME NÃO IDENTIFICADO';
+  
   // Convert to Title Case
-  cleaned = cleaned
-    .toLowerCase()
-    .split(' ')
+  cleaned = words
     .map(word => {
       // Keep small words lowercase (de, da, do, dos, das, e)
-      if (['de', 'da', 'do', 'dos', 'das', 'e'].includes(word)) {
-        return word;
+      if (['de', 'da', 'do', 'dos', 'das', 'e'].includes(word.toLowerCase())) {
+        return word.toLowerCase();
       }
-      return word.charAt(0).toUpperCase() + word.slice(1);
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(' ');
   
-  // Limit length
-  if (cleaned.length > 100) {
-    cleaned = cleaned.substring(0, 100);
+  // Limit length (max 60 chars)
+  if (cleaned.length > 60) {
+    cleaned = cleaned.substring(0, 60);
   }
   
   return cleaned || 'NOME NÃO IDENTIFICADO';
@@ -368,6 +376,11 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
   logger.info('Parse', `Data de Devolução: ${defaultDate || 'não encontrada'}`);
   logger.info('Parse', `Total esperado: ${expectedTotal || 'não informado'}`);
   
+  // DEBUG: Log sample of extracted text for debugging
+  logger.info('Debug', 'Amostra do texto extraído (primeiros 500 chars):', { 
+    sample: text.substring(0, 500).replace(/\n/g, ' | ') 
+  });
+  
   // Pattern 1: Tabular format with pipes
   // | Grupo | Data | Posição | Objeto | Destinatário |
   const tablePattern = /\|\s*(\d+)\s*\|\s*(\d{2}\/\d{2}\/\d{4})\s*\|\s*([A-Z]{2,4}\s*-\s*\d+)\s*\|\s*([A-Z]{2}\d{9}[A-Z]{2})\s*\|\s*([^|]+)\s*\|/g;
@@ -407,13 +420,46 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
   
   logger.info('Parse', `Padrão tabular: ${packages.length} encomendas`);
   
-  // Pattern 2: Fallback - line by line parsing
+  // Pattern 1.5: LDI format without pipes (common in extracted text)
+  // Format: "1 08/12/2025 PCM - 120 AN246666127BR Vanusa Novais Rodrigues :RUA..."
+  if (packages.length === 0) {
+    logger.info('Parse', 'Tentando padrão LDI (sem pipes)');
+    
+    // Regex: número data posição código nome (até : ou fim ou próximo número)
+    const ldiPattern = /(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+([A-Z]{2,4}\s*-\s*\d+)\s+([A-Z]{2}\d{9}[A-Z]{2})\s+([A-ZÀ-Ú][A-Za-zÀ-ú\s]+?)(?=\s*:|$|\s+\d+\s+\d{2}\/)/g;
+    
+    let ldiMatch;
+    while ((ldiMatch = ldiPattern.exec(text)) !== null) {
+      const [_, lineNum, dateStr, position, trackingCode, recipientRaw] = ldiMatch;
+      lineNumber++;
+      
+      if (!isValidTrackingCode(trackingCode) || seenCodes.has(trackingCode)) continue;
+      
+      const parsedDate = parseDate(dateStr);
+      seenCodes.add(trackingCode);
+      
+      packages.push({
+        lineNumber: parseInt(lineNum) || lineNumber,
+        trackingCode: trackingCode.toUpperCase(),
+        recipient: cleanRecipientName(recipientRaw),
+        position: cleanPosition(position),
+        date: parsedDate?.date || dateStr,
+        dateISO: parsedDate?.dateISO || new Date().toISOString().split('T')[0],
+        confidence: 90
+      });
+    }
+    
+    logger.info('Parse', `Padrão LDI: ${packages.length} encomendas`);
+  }
+  
+  // Pattern 2: Fallback - line by line parsing with improved name extraction
   if (packages.length === 0) {
     logger.info('Parse', 'Tentando padrão alternativo (linha por linha)');
     
     const lines = text.split('\n').filter(l => l.trim().length > 0);
     
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       // Find tracking codes in line
       const codes = line.match(TRACKING_CODE_GLOBAL) || [];
       
@@ -431,21 +477,49 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
         const positionMatches = line.match(POSITION_REGEX);
         const position = positionMatches?.[0] || '';
         
-        // Extract recipient (text after tracking code, before : or end)
-        const afterCode = line.split(code)[1] || '';
-        let recipient = afterCode
-          .replace(/[|:].*/g, '')
-          .replace(/\d{2}\/\d{2}\/\d{4}/g, '')
-          .trim();
+        // IMPROVED: Multi-strategy name extraction
+        let recipient = 'NOME NÃO IDENTIFICADO';
         
-        if (!recipient || recipient.length < 2) {
-          // Try text before the code
-          const beforeCode = line.split(code)[0] || '';
-          recipient = beforeCode
-            .replace(/.*\|/g, '')
-            .replace(/\d{2}\/\d{2}\/\d{4}/g, '')
-            .replace(/[A-Z]{2,4}\s*-\s*\d+/g, '')
-            .trim();
+        // Strategy 1: Name after tracking code (most common in LDI format)
+        const afterCodeMatch = line.match(new RegExp(code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s]{3,50}?)(?:\\s*:|$|\\s+\\d)'));
+        if (afterCodeMatch && afterCodeMatch[1]) {
+          const candidateName = cleanRecipientName(afterCodeMatch[1]);
+          if (candidateName !== 'NOME NÃO IDENTIFICADO') {
+            recipient = candidateName;
+          }
+        }
+        
+        // Strategy 2: If failed, look in the next line (if it doesn't contain a tracking code)
+        if (recipient === 'NOME NÃO IDENTIFICADO' && i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          // If next line doesn't contain tracking code, might be name continuation
+          if (!TRACKING_CODE_GLOBAL.test(nextLine)) {
+            const nameMatch = nextLine.match(/^([A-ZÀ-Ú][A-Za-zÀ-ú\s]{3,50}?)(?:\s*:|$)/);
+            if (nameMatch && nameMatch[1]) {
+              const candidateName = cleanRecipientName(nameMatch[1]);
+              if (candidateName !== 'NOME NÃO IDENTIFICADO') {
+                recipient = candidateName;
+              }
+            }
+          }
+        }
+        
+        // Strategy 3: Find any valid name pattern in the line
+        if (recipient === 'NOME NÃO IDENTIFICADO') {
+          // Look for pattern: First Last (with possible middle names)
+          const namePatterns = line.match(/[A-ZÀ-Ú][a-zA-ZÀ-ú]+\s+[A-ZÀ-Ú][a-zA-ZÀ-ú]+(?:\s+[A-Za-zÀ-ú]+)*/g);
+          if (namePatterns) {
+            for (const pattern of namePatterns) {
+              // Skip if pattern looks like address (contains RUA, AV, etc.)
+              if (/\b(RUA|AV|AVENIDA|TRAVESSA|ESTRADA|RODOVIA|BR|KM)\b/i.test(pattern)) continue;
+              
+              const candidateName = cleanRecipientName(pattern);
+              if (candidateName !== 'NOME NÃO IDENTIFICADO' && candidateName.length >= 5) {
+                recipient = candidateName;
+                break;
+              }
+            }
+          }
         }
         
         seenCodes.add(code);
@@ -453,11 +527,11 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
         packages.push({
           lineNumber,
           trackingCode: code.toUpperCase(),
-          recipient: cleanRecipientName(recipient),
+          recipient,
           position: cleanPosition(position),
           date: parsedDate?.date || dateStr || new Date().toLocaleDateString('pt-BR'),
           dateISO: parsedDate?.dateISO || new Date().toISOString().split('T')[0],
-          confidence: 60
+          confidence: recipient === 'NOME NÃO IDENTIFICADO' ? 40 : 70
         });
       }
     }

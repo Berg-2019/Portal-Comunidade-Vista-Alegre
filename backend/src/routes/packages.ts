@@ -419,20 +419,24 @@ router.post('/', authenticateToken, async (req: Request, res: Response): Promise
   }
 });
 
-// Admin: Update package status
+// Admin: Update package (all fields)
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, recipient_name, tracking_code, arrival_date, pickup_deadline } = req.body;
 
     const result = await query(
       `UPDATE packages 
        SET status = COALESCE($1, status),
            notes = COALESCE($2, notes),
+           recipient_name = COALESCE($3, recipient_name),
+           tracking_code = COALESCE($4, tracking_code),
+           arrival_date = COALESCE($5, arrival_date),
+           pickup_deadline = COALESCE($6, pickup_deadline),
            updated_at = NOW()
-       WHERE id = $3
+       WHERE id = $7
        RETURNING *`,
-      [status, notes, id]
+      [status, notes, recipient_name, tracking_code, arrival_date, pickup_deadline, id]
     );
 
     if (result.rows.length === 0) {

@@ -25,9 +25,38 @@ import {
   Bot,
   Loader2,
   Palette,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import AdminNewsManager from "@/components/admin/AdminNewsManager";
@@ -54,6 +83,7 @@ interface PackageItem {
   status: PackageStatus;
   arrival_date: string;
   pickup_deadline: string;
+  notes?: string;
 }
 
 const statusConfig = {
@@ -83,6 +113,11 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pdfUploadOpen, setPdfUploadOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<PackageItem | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingPackageId, setDeletingPackageId] = useState<string | number | null>(null);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -154,6 +189,75 @@ export default function AdminDashboard() {
 
   const handlePdfImportSuccess = () => {
     loadPackages();
+  };
+
+  const openEditModal = (pkg: PackageItem) => {
+    setEditingPackage({ ...pkg });
+    setEditModalOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingPackage) return;
+    
+    setSaving(true);
+    try {
+      await api.updatePackage(String(editingPackage.id), {
+        recipient_name: editingPackage.recipient_name,
+        tracking_code: editingPackage.tracking_code,
+        arrival_date: editingPackage.arrival_date,
+        pickup_deadline: editingPackage.pickup_deadline,
+        status: editingPackage.status,
+        notes: editingPackage.notes,
+      });
+      
+      setPackages((prev) =>
+        prev.map((pkg) => (pkg.id === editingPackage.id ? editingPackage : pkg))
+      );
+      
+      setEditModalOpen(false);
+      setEditingPackage(null);
+      toast({
+        title: "Encomenda atualizada",
+        description: "Os dados foram salvos com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar encomenda:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as alterações.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDeleteDialog = (id: string | number) => {
+    setDeletingPackageId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPackageId) return;
+    
+    try {
+      await api.deletePackage(String(deletingPackageId));
+      setPackages((prev) => prev.filter((pkg) => pkg.id !== deletingPackageId));
+      toast({
+        title: "Encomenda excluída",
+        description: "A encomenda foi removida do sistema.",
+      });
+    } catch (error) {
+      console.error("Erro ao excluir encomenda:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a encomenda.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingPackageId(null);
+    }
   };
 
   const getTabTitle = () => {
@@ -451,6 +555,24 @@ export default function AdminDashboard() {
                                       Restaurar
                                     </Button>
                                   )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => openEditModal(pkg)}
+                                    title="Editar"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => openDeleteDialog(pkg.id)}
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               </td>
                             </tr>
@@ -521,6 +643,114 @@ export default function AdminDashboard() {
           onOpenChange={setPdfUploadOpen}
           onImportSuccess={handlePdfImportSuccess}
         />
+
+        {/* Edit Package Modal */}
+        <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Encomenda</DialogTitle>
+              <DialogDescription>
+                Altere os dados da encomenda abaixo.
+              </DialogDescription>
+            </DialogHeader>
+            {editingPackage && (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recipient_name">Nome do Destinatário</Label>
+                  <Input
+                    id="recipient_name"
+                    value={editingPackage.recipient_name}
+                    onChange={(e) => setEditingPackage({ ...editingPackage, recipient_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tracking_code">Código de Rastreamento</Label>
+                  <Input
+                    id="tracking_code"
+                    value={editingPackage.tracking_code}
+                    onChange={(e) => setEditingPackage({ ...editingPackage, tracking_code: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="arrival_date">Data de Chegada</Label>
+                    <Input
+                      id="arrival_date"
+                      type="date"
+                      value={editingPackage.arrival_date?.split('T')[0] || ''}
+                      onChange={(e) => setEditingPackage({ ...editingPackage, arrival_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup_deadline">Prazo de Retirada</Label>
+                    <Input
+                      id="pickup_deadline"
+                      type="date"
+                      value={editingPackage.pickup_deadline?.split('T')[0] || ''}
+                      onChange={(e) => setEditingPackage({ ...editingPackage, pickup_deadline: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={editingPackage.status}
+                    onValueChange={(value: PackageStatus) => setEditingPackage({ ...editingPackage, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aguardando">Aguardando</SelectItem>
+                      <SelectItem value="entregue">Entregue</SelectItem>
+                      <SelectItem value="devolvido">Devolvido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Observações</Label>
+                  <Textarea
+                    id="notes"
+                    value={editingPackage.notes || ''}
+                    onChange={(e) => setEditingPackage({ ...editingPackage, notes: e.target.value })}
+                    placeholder="Observações adicionais..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditSave} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta encomenda? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={handleDeleteConfirm}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

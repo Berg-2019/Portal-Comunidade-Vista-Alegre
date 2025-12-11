@@ -217,7 +217,14 @@ class ApiService {
     });
   }
 
-  async updatePackage(id: string, data: { status?: string; notes?: string }) {
+  async updatePackage(id: string, data: { 
+    status?: string; 
+    notes?: string;
+    recipient_name?: string;
+    tracking_code?: string;
+    arrival_date?: string;
+    pickup_deadline?: string;
+  }) {
     return this.request<{ success: boolean; package: any }>(`/api/packages/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

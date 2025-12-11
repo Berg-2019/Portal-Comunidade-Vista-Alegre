@@ -318,6 +318,20 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
+
+      -- PDF cache table for processed results
+      CREATE TABLE IF NOT EXISTS pdf_cache (
+        id SERIAL PRIMARY KEY,
+        file_hash VARCHAR(64) UNIQUE NOT NULL,
+        original_name VARCHAR(255),
+        result JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '24 hours'
+      );
+
+      -- Create index for faster cache lookups
+      CREATE INDEX IF NOT EXISTS idx_pdf_cache_hash ON pdf_cache(file_hash);
+      CREATE INDEX IF NOT EXISTS idx_pdf_cache_expires ON pdf_cache(expires_at);
     `);
 
     console.log('✅ Database initialized successfully');

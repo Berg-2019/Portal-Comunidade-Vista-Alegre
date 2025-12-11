@@ -4,47 +4,8 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-
-// Carregador sob demanda do pdf-parse para melhor compatibilidade
-let pdfParser: any = null;
-
-async function loadPdfParser(): Promise<any> {
-  if (pdfParser) return pdfParser;
-  
-  try {
-    const module: any = await import('pdf-parse');
-    
-    console.log('🔍 pdf-parse module keys:', Object.keys(module));
-    
-    // pdf-parse v2.x: PDFParse é uma classe que precisa ser instanciada
-    if (module.PDFParse && typeof module.PDFParse === 'function') {
-      const instance = new module.PDFParse();
-      // Wrapper para compatibilidade: retorna função que chama loadPDF
-      pdfParser = (buffer: Buffer) => instance.loadPDF(buffer);
-      console.log('✅ pdf-parse v2.x carregado (classe PDFParse)');
-      return pdfParser;
-    }
-    
-    // pdf-parse v1.x fallbacks
-    if (typeof module === 'function') {
-      pdfParser = module;
-      console.log('✅ pdf-parse v1.x carregado (module direto)');
-    } else if (typeof module.default === 'function') {
-      pdfParser = module.default;
-      console.log('✅ pdf-parse v1.x carregado (module.default)');
-    } else if (module.default && typeof module.default.default === 'function') {
-      pdfParser = module.default.default;
-      console.log('✅ pdf-parse v1.x carregado (module.default.default)');
-    } else {
-      throw new Error('Formato do módulo pdf-parse não reconhecido');
-    }
-    
-    return pdfParser;
-  } catch (error) {
-    console.error('❌ Erro ao carregar pdf-parse:', error);
-    return null;
-  }
-}
+import { CorreiosPDFParser, isValidTrackingCode, cleanRecipientName } from '../utils/pdfParser';
+import { cleanExpiredCache, getCacheStats } from '../utils/pdfCache';
 
 const router = Router();
 
@@ -75,131 +36,43 @@ const upload = multer({
   }
 });
 
-// PDF Extraction patterns - Brazilian tracking codes
-const TRACKING_CODE_REGEX = /[A-Z]{2}\d{9}[A-Z]{2}/g;
-
-interface ExtractedPackage {
-  recipient_name: string;
-  tracking_code: string;
-  arrival_date: string;
-  confidence: number;
-}
-
-// Sanitize recipient name
-function sanitizeRecipientName(name: string): string {
-  return name
-    .replace(/[<>\"'&;]/g, '') // Remove potentially dangerous characters
-    .replace(/:\s*$/, '') // Remove trailing colon
-    .trim()
-    .substring(0, 100); // Limit length
-}
-
-// Validate Brazilian tracking code format
-function isValidTrackingCode(code: string): boolean {
-  return /^[A-Z]{2}\d{9}[A-Z]{2}$/.test(code);
-}
-
-// Extract packages from PDF text - Formato LDI Correios
-function extractPackagesFromText(text: string): ExtractedPackage[] {
-  const packages: ExtractedPackage[] = [];
-  
-  console.log('📄 Texto do PDF (primeiros 1000 chars):', text.substring(0, 1000));
-  
-  // Extrair data de devolução do cabeçalho (usada como referência de data)
-  const returnDateMatch = text.match(/Data de Devolução:\s*(\d{2}\/\d{2}\/\d{4})/);
-  const returnDate = returnDateMatch ? returnDateMatch[1] : null;
-  console.log('📅 Data de Devolução encontrada:', returnDate);
-  
-  // Extrair total esperado de objetos
-  const totalMatch = text.match(/Total de objetos:\s*(\d+)/);
-  const expectedTotal = totalMatch ? parseInt(totalMatch[1]) : 0;
-  console.log('📦 Total de objetos esperado:', expectedTotal);
-  
-  // Padrão 1: Formato tabular LDI com colunas separadas por |
-  // | Grupo | Data | Posição | Objeto | Destinatário |
-  const tablePattern = /\|\s*\d+\s*\|\s*(\d{2}\/\d{2}\/\d{4})\s*\|\s*[A-Z]+-\s*\d+\s*\|\s*([A-Z]{2}\d{9}[A-Z]{2})\s*\|\s*([^|]+)\s*\|/g;
-  
-  let match;
-  while ((match = tablePattern.exec(text)) !== null) {
-    const [_, date, trackingCode, recipientRaw] = match;
+// Cleanup temp files older than 24 hours
+async function cleanupTempFiles(): Promise<void> {
+  try {
+    const uploadDir = path.join(__dirname, '../../uploads/pdfs');
+    if (!fs.existsSync(uploadDir)) return;
     
-    // Limpar nome do destinatário (remover : e texto após, como endereço)
-    let recipient = recipientRaw.trim();
-    if (recipient.includes(':')) {
-      recipient = recipient.split(':')[0].trim();
-    }
+    const files = fs.readdirSync(uploadDir);
+    const now = Date.now();
+    let cleaned = 0;
     
-    // Converter data DD/MM/YYYY para YYYY-MM-DD
-    const [day, month, year] = date.split('/');
-    const arrivalDate = `${year}-${month}-${day}`;
-    
-    packages.push({
-      recipient_name: sanitizeRecipientName(recipient),
-      tracking_code: trackingCode,
-      arrival_date: arrivalDate,
-      confidence: 100 // Alta confiança para formato tabular
-    });
-  }
-  
-  console.log(`📊 Padrão tabular: ${packages.length} encomendas encontradas`);
-  
-  // Padrão 2: Fallback - buscar tracking codes e tentar associar dados
-  if (packages.length === 0) {
-    console.log('⚠️ Padrão tabular não encontrou dados, tentando fallback...');
-    
-    const trackingCodes = text.match(TRACKING_CODE_REGEX) || [];
-    console.log(`🔍 Códigos de rastreio encontrados (fallback): ${trackingCodes.length}`);
-    
-    // Procurar por linhas que contenham data + código + nome
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
-    for (const code of trackingCodes) {
-      if (!isValidTrackingCode(code)) continue;
+    for (const file of files) {
+      const filePath = path.join(uploadDir, file);
+      const stats = fs.statSync(filePath);
+      const age = now - stats.mtimeMs;
       
-      // Encontrar a linha que contém este código
-      const lineWithCode = lines.find(line => line.includes(code));
-      
-      if (lineWithCode) {
-        // Tentar extrair data da mesma linha
-        const dateMatch = lineWithCode.match(/(\d{2}\/\d{2}\/\d{4})/);
-        let arrivalDate = new Date().toISOString().split('T')[0];
-        
-        if (dateMatch) {
-          const [day, month, year] = dateMatch[1].split('/');
-          arrivalDate = `${year}-${month}-${day}`;
-        }
-        
-        // Tentar extrair nome (texto após o código, antes de : ou fim da linha)
-        const afterCode = lineWithCode.split(code)[1] || '';
-        let recipient = afterCode.replace(/[|:].*/g, '').trim();
-        
-        if (!recipient || recipient.length < 2) {
-          recipient = 'NOME NÃO IDENTIFICADO';
-        }
-        
-        packages.push({
-          recipient_name: sanitizeRecipientName(recipient),
-          tracking_code: code,
-          arrival_date: arrivalDate,
-          confidence: 50 // Confiança média para fallback
-        });
+      // Remove files older than 24 hours
+      if (age > 24 * 60 * 60 * 1000) {
+        fs.unlinkSync(filePath);
+        cleaned++;
       }
     }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 ${cleaned} arquivo(s) temporário(s) removido(s)`);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao limpar arquivos temporários:', error);
   }
-  
-  // Remove duplicates by tracking code
-  const uniquePackages = packages.filter((pkg, index, self) =>
-    index === self.findIndex(p => p.tracking_code === pkg.tracking_code)
-  );
-  
-  // Validar total extraído
-  if (expectedTotal > 0 && uniquePackages.length !== expectedTotal) {
-    console.log(`⚠️ Atenção: Extraído ${uniquePackages.length} de ${expectedTotal} esperados`);
-  }
-  
-  console.log(`✅ Total final: ${uniquePackages.length} encomendas extraídas`);
-  return uniquePackages;
 }
+
+// Run cleanup on startup and every 6 hours
+cleanupTempFiles();
+cleanExpiredCache();
+setInterval(() => {
+  cleanupTempFiles();
+  cleanExpiredCache();
+}, 6 * 60 * 60 * 1000);
 
 // Public: Get packages (for public consultation)
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -284,61 +157,135 @@ router.get('/admin/stats', authenticateToken, async (req: Request, res: Response
   }
 });
 
+// Admin: Get cache statistics
+router.get('/admin/cache-stats', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const stats = await getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching cache stats:', error);
+    res.status(500).json({ error: 'Error fetching cache stats' });
+  }
+});
+
 // Admin: Upload PDF and extract packages (returns preview for confirmation)
 router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: Request, res: Response): Promise<void> => {
+  const startTime = Date.now();
+  
   try {
     if (!req.file) {
-      res.status(400).json({ error: 'No PDF file uploaded' });
+      res.status(400).json({ 
+        success: false,
+        error: 'Nenhum arquivo PDF enviado' 
+      });
       return;
     }
 
-    let extractedPackages: ExtractedPackage[] = [];
-    let autoExtracted = false;
-
-    // Carregar pdf-parse sob demanda
-    const parser = await loadPdfParser();
+    console.log(`📄 Upload recebido: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
     
-    if (parser) {
-      try {
-        const pdfBuffer = fs.readFileSync(req.file.path);
-        console.log('📄 Lendo PDF, tamanho:', pdfBuffer.length, 'bytes');
-        
-        const pdfData = await parser(pdfBuffer);
-        console.log('📄 Texto extraído (primeiros 500 chars):', pdfData.text.substring(0, 500));
-        
-        extractedPackages = extractPackagesFromText(pdfData.text);
-        autoExtracted = extractedPackages.length > 0;
-        console.log(`📦 ${extractedPackages.length} encomenda(s) extraída(s) do PDF`);
-      } catch (parseError) {
-        console.error('❌ Erro ao parsear PDF:', parseError);
-      }
-    } else {
-      console.warn('⚠️ pdf-parse não disponível');
-    }
-
-    // If no automatic extraction, try to use manual data if provided
-    if (extractedPackages.length === 0 && req.body.packages) {
-      try {
-        extractedPackages = JSON.parse(req.body.packages);
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-
-    res.json({
-      success: true,
-      results: {
-        packages: extractedPackages,
-        filename: req.file.filename,
-        autoExtracted
-      },
-      message: autoExtracted 
-        ? `${extractedPackages.length} encomenda(s) extraída(s) automaticamente. Revise os dados antes de confirmar.`
-        : 'Não foi possível extrair dados automaticamente. Adicione manualmente ou tente outro PDF.'
+    // Use the robust parser
+    const parser = new CorreiosPDFParser({
+      enableCache: true,
+      enableLogging: true
     });
-  } catch (error) {
-    console.error('Error processing PDF:', error);
-    res.status(500).json({ error: 'Error processing PDF' });
+    
+    const parseResult = await parser.parse(req.file.path);
+    
+    // Transform to API response format
+    const response = {
+      success: parseResult.success,
+      results: {
+        packages: parseResult.packages.map(pkg => ({
+          recipient_name: pkg.recipient,
+          tracking_code: pkg.trackingCode,
+          arrival_date: pkg.dateISO,
+          position: pkg.position,
+          confidence: pkg.confidence,
+          lineNumber: pkg.lineNumber
+        })),
+        filename: req.file.filename,
+        autoExtracted: parseResult.success
+      },
+      metadata: parseResult.metadata,
+      errors: parseResult.errors,
+      warnings: parseResult.warnings,
+      message: parseResult.success
+        ? `${parseResult.totalPackages} encomenda(s) extraída(s) automaticamente usando ${parseResult.metadata.strategy}. Revise os dados antes de confirmar.`
+        : `Não foi possível extrair dados: ${parseResult.errors.join(', ')}`,
+      processingTime: Date.now() - startTime
+    };
+
+    res.json(response);
+    
+  } catch (error: any) {
+    console.error('❌ Erro no upload de PDF:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erro ao processar PDF',
+      details: error.message,
+      processingTime: Date.now() - startTime
+    });
+  }
+});
+
+// Admin: Upload LDI list (alias for upload-pdf with enhanced response)
+router.post('/upload-lista', authenticateToken, upload.single('pdf'), async (req: Request, res: Response): Promise<void> => {
+  const startTime = Date.now();
+  
+  try {
+    if (!req.file) {
+      res.status(400).json({ 
+        success: false,
+        error: 'Nenhum arquivo PDF enviado' 
+      });
+      return;
+    }
+
+    console.log(`📄 Upload LDI: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
+    
+    const parser = new CorreiosPDFParser({
+      enableCache: true,
+      enableLogging: true
+    });
+    
+    const parseResult = await parser.parse(req.file.path);
+    
+    // Enhanced response format as specified
+    const response = {
+      success: parseResult.success,
+      totalPackages: parseResult.totalPackages,
+      metadata: {
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        processingTime: parseResult.metadata.processingTime,
+        strategy: parseResult.metadata.strategy,
+        uploadedAt: new Date().toISOString(),
+        expectedTotal: parseResult.metadata.expectedTotal,
+        extractedTotal: parseResult.metadata.extractedTotal,
+        pagesProcessed: parseResult.metadata.pagesProcessed
+      },
+      packages: parseResult.packages.map(pkg => ({
+        lineNumber: pkg.lineNumber,
+        trackingCode: pkg.trackingCode,
+        recipient: pkg.recipient,
+        position: pkg.position,
+        date: pkg.date,
+        dateISO: pkg.dateISO,
+        confidence: pkg.confidence
+      })),
+      errors: parseResult.errors,
+      warnings: parseResult.warnings
+    };
+
+    res.json(response);
+    
+  } catch (error: any) {
+    console.error('❌ Erro no upload LDI:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erro ao processar PDF',
+      details: error.message
+    });
   }
 });
 
@@ -363,48 +310,71 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
 
     for (const pkg of packagesToImport) {
       try {
+        // Support both formats (from upload-pdf and upload-lista)
+        const recipientName = pkg.recipient_name || pkg.recipient;
+        const trackingCode = pkg.tracking_code || pkg.trackingCode;
+        const arrivalDateStr = pkg.arrival_date || pkg.dateISO;
+        
         // Validate required fields
-        if (!pkg.recipient_name || !pkg.tracking_code) {
+        if (!recipientName || !trackingCode) {
           results.errors++;
-          results.details.push({ tracking_code: pkg.tracking_code || 'N/A', status: 'error', reason: 'Campos obrigatórios faltando' });
+          results.details.push({ 
+            tracking_code: trackingCode || 'N/A', 
+            status: 'error', 
+            reason: 'Campos obrigatórios faltando' 
+          });
           continue;
         }
 
         // Validate tracking code format
-        if (!isValidTrackingCode(pkg.tracking_code)) {
+        if (!isValidTrackingCode(trackingCode)) {
           results.errors++;
-          results.details.push({ tracking_code: pkg.tracking_code, status: 'error', reason: 'Formato de código inválido' });
+          results.details.push({ 
+            tracking_code: trackingCode, 
+            status: 'error', 
+            reason: 'Formato de código inválido' 
+          });
           continue;
         }
 
         // Check if tracking code already exists
         const existing = await query(
           'SELECT id FROM packages WHERE tracking_code = $1',
-          [pkg.tracking_code]
+          [trackingCode]
         );
 
         if (existing.rows.length > 0) {
           results.duplicates++;
-          results.details.push({ tracking_code: pkg.tracking_code, status: 'duplicate' });
+          results.details.push({ tracking_code: trackingCode, status: 'duplicate' });
           continue;
         }
 
         // Calculate pickup deadline (7 days from arrival)
-        const arrivalDate = new Date(pkg.arrival_date || new Date());
+        const arrivalDate = new Date(arrivalDateStr || new Date());
         const pickupDeadline = new Date(arrivalDate);
         pickupDeadline.setDate(pickupDeadline.getDate() + 7);
 
         await query(
           `INSERT INTO packages (recipient_name, tracking_code, status, arrival_date, pickup_deadline, pdf_source)
            VALUES ($1, $2, 'aguardando', $3, $4, $5)`,
-          [sanitizeRecipientName(pkg.recipient_name), pkg.tracking_code, arrivalDate.toISOString().split('T')[0], pickupDeadline, filename || null]
+          [
+            cleanRecipientName(recipientName), 
+            trackingCode.toUpperCase(), 
+            arrivalDate.toISOString().split('T')[0], 
+            pickupDeadline, 
+            filename || null
+          ]
         );
 
         results.imported++;
-        results.details.push({ tracking_code: pkg.tracking_code, status: 'imported' });
+        results.details.push({ tracking_code: trackingCode, status: 'imported' });
       } catch (err: any) {
         results.errors++;
-        results.details.push({ tracking_code: pkg.tracking_code, status: 'error', reason: err.message });
+        results.details.push({ 
+          tracking_code: pkg.tracking_code || pkg.trackingCode, 
+          status: 'error', 
+          reason: err.message 
+        });
       }
     }
 
@@ -435,7 +405,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response): Promise
       `INSERT INTO packages (recipient_name, tracking_code, status, arrival_date, pickup_deadline, notes)
        VALUES ($1, $2, 'aguardando', $3, $4, $5)
        RETURNING *`,
-      [sanitizeRecipientName(recipient_name), tracking_code, arrival_date, pickupDeadline, notes]
+      [cleanRecipientName(recipient_name), tracking_code.toUpperCase(), arrival_date, pickupDeadline, notes]
     );
 
     res.json({ success: true, package: result.rows[0] });
@@ -493,6 +463,17 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
   } catch (error) {
     console.error('Error deleting package:', error);
     res.status(500).json({ error: 'Error deleting package' });
+  }
+});
+
+// Admin: Clear PDF cache
+router.post('/admin/clear-cache', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const cleaned = await cleanExpiredCache();
+    res.json({ success: true, cleaned });
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    res.status(500).json({ error: 'Error clearing cache' });
   }
 });
 

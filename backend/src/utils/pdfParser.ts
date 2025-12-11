@@ -489,7 +489,7 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
         
         // Strategy 1: Name after tracking code with improved lookahead (stops at : or | or next tracking code)
         const afterCodeMatch = line.match(new RegExp(
-          code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s\\.\\-\\']{3,60}?)(?=\\s*:|\\s*\\||\\s+[A-Z]{2}\\d{9}[A-Z]{2}|$)'
+          code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s.\\-]{3,60}?)(?=\\s*:|\\s*\\||\\s+[A-Z]{2}\\d{9}[A-Z]{2}|$)'
         ));
         if (afterCodeMatch && afterCodeMatch[1]) {
           const candidateName = cleanRecipientName(afterCodeMatch[1]);

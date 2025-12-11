@@ -187,14 +187,26 @@ async function extractWithPdfParseV2(buffer: Buffer, logger: PDFLogger): Promise
     
     if (module.PDFParse && typeof module.PDFParse === 'function') {
       logger.info('Strategy', 'Tentando pdf-parse v2.x (PDFParse class)');
-      const instance = new module.PDFParse();
-      const data = await instance.loadPDF(buffer);
       
-      return {
-        text: data.text || '',
-        pages: data.numpages || 1,
-        strategy: 'pdf-parse-v2'
-      };
+      try {
+        // Add configuration to prevent verbosity errors
+        const instance = new module.PDFParse({
+          verbosity: 0,
+          max: 0
+        });
+        
+        const data = await instance.loadPDF(buffer);
+        
+        return {
+          text: data.text || '',
+          pages: data.numpages || 1,
+          strategy: 'pdf-parse-v2'
+        };
+      } catch (innerError: any) {
+        logger.warn('Strategy', 'pdf-parse v2.x (new PDFParse) falhou', { 
+          error: innerError.message 
+        });
+      }
     }
     
     return null;
@@ -239,7 +251,47 @@ async function extractWithPdfParseV1(buffer: Buffer, logger: PDFLogger): Promise
 }
 
 /**
- * Strategy 3: pdfjs-dist (direct usage)
+ * Strategy 3: pdf-parse direct call (most compatible via require)
+ */
+async function extractWithPdfParseDirect(buffer: Buffer, logger: PDFLogger): Promise<RawTextResult | null> {
+  try {
+    logger.info('Strategy', 'Tentando pdf-parse (chamada direta via require)');
+    
+    // Use require for maximum compatibility with CommonJS
+    const pdfParse = require('pdf-parse');
+    
+    // Check if it's a function (v1.x style)
+    if (typeof pdfParse === 'function') {
+      const data = await pdfParse(buffer, { max: 0 });
+      
+      return {
+        text: data.text || '',
+        pages: data.numpages || 1,
+        strategy: 'pdf-parse-direct'
+      };
+    }
+    
+    // Check if default export is a function
+    if (pdfParse.default && typeof pdfParse.default === 'function') {
+      const data = await pdfParse.default(buffer, { max: 0 });
+      
+      return {
+        text: data.text || '',
+        pages: data.numpages || 1,
+        strategy: 'pdf-parse-direct-default'
+      };
+    }
+    
+    logger.warn('Strategy', 'pdf-parse direct: formato não reconhecido');
+    return null;
+  } catch (error: any) {
+    logger.warn('Strategy', 'pdf-parse direto falhou', { error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Strategy 4: pdfjs-dist (direct usage with Uint8Array conversion)
  */
 async function extractWithPdfJsDist(buffer: Buffer, logger: PDFLogger): Promise<RawTextResult | null> {
   try {
@@ -259,15 +311,29 @@ async function extractWithPdfJsDist(buffer: Buffer, logger: PDFLogger): Promise<
       }
     }
     
-    const doc = await pdfjsLib.getDocument({ data: buffer }).promise;
+    // CRITICAL FIX: Convert Buffer to Uint8Array
+    const uint8Array = new Uint8Array(buffer);
+    
+    // Add proper configuration
+    const doc = await pdfjsLib.getDocument({ 
+      data: uint8Array,
+      verbosity: 0,
+      isEvalSupported: false,
+      useSystemFonts: true
+    }).promise;
+    
     const textPages: string[] = [];
     
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
+      
+      // Filter empty strings
       const pageText = content.items
-        .map((item: any) => item.str)
+        .map((item: any) => item.str || '')
+        .filter((str: string) => str.trim().length > 0)
         .join(' ');
+        
       textPages.push(pageText);
     }
     
@@ -508,15 +574,20 @@ export class CorreiosPDFParser {
       // Try extraction strategies in order
       let rawResult: RawTextResult | null = null;
       
-      // Strategy 1: pdf-parse v2.x
+      // Strategy 1: pdf-parse v2.x (PDFParse class)
       rawResult = await extractWithPdfParseV2(buffer, this.logger);
       
-      // Strategy 2: pdf-parse v1.x
+      // Strategy 2: pdf-parse v1.x (direct import)
       if (!rawResult) {
         rawResult = await extractWithPdfParseV1(buffer, this.logger);
       }
       
-      // Strategy 3: pdfjs-dist
+      // Strategy 3: pdf-parse direct (require - most compatible)
+      if (!rawResult) {
+        rawResult = await extractWithPdfParseDirect(buffer, this.logger);
+      }
+      
+      // Strategy 4: pdfjs-dist (last fallback)
       if (!rawResult) {
         rawResult = await extractWithPdfJsDist(buffer, this.logger);
       }

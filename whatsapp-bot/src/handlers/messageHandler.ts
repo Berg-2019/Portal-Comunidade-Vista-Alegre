@@ -22,6 +22,7 @@ export class MessageHandler {
   }
 
   async handleMessage(msg: proto.IWebMessageInfo, sock: WASocket): Promise<void> {
+    if (!msg.key) return;
     const jid = msg.key.remoteJid;
     if (!jid) return;
 

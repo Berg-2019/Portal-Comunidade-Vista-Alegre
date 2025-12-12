@@ -197,6 +197,11 @@ export class WhatsAppBot {
     if (!socket.authState.creds.registered) {
       if (this.connectionMethod === 'pairing' && this.pendingPhoneNumber) {
         warningLog('Credenciais ainda não configuradas!');
+        
+        // Aguardar 5 segundos para socket WebSocket estar pronto
+        infoLog('Aguardando socket ficar pronto (5 segundos)...');
+        await new Promise(r => setTimeout(r, 5000));
+        
         infoLog(`Solicitando código de pareamento para: ${this.pendingPhoneNumber}`);
 
         try {

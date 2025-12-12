@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { botApi, BotStatus, BotMetrics } from '@/services/botApi';
 import {
@@ -36,7 +39,9 @@ import {
   AlertCircle,
   XCircle,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  Smartphone,
+  Hash
 } from 'lucide-react';
 
 const BOT_API_URL = import.meta.env.VITE_BOT_API_URL || 'http://localhost:3002';
@@ -46,6 +51,8 @@ export function AdminBotManager() {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [metrics, setMetrics] = useState<BotMetrics | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -53,20 +60,17 @@ export function AdminBotManager() {
   const [latency, setLatency] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isApiReachable, setIsApiReachable] = useState(true);
+  const [connectionMethod, setConnectionMethod] = useState<'code' | 'qr'>('code');
 
   const fetchStatus = useCallback(async () => {
     try {
-      console.log('[Bot Debug] Tentando conectar em:', BOT_API_URL);
-      
       const startTime = Date.now();
       
-      // Health check first
       try {
         await botApi.healthCheck();
         setIsApiReachable(true);
         setApiError(null);
       } catch (healthError) {
-        console.error('[Bot Debug] Health check falhou:', healthError);
         setIsApiReachable(false);
         setApiError(`API do Bot não está acessível em ${BOT_API_URL}`);
         setLoading(false);
@@ -86,20 +90,29 @@ export function AdminBotManager() {
         try {
           const qrData = await botApi.getQRCode();
           setQrCode(qrData.qr);
-          console.log('[Bot Debug] QR Code recebido');
-        } catch (qrError) {
-          console.error('[Bot Debug] Erro ao buscar QR Code:', qrError);
+        } catch {
           setQrCode(null);
         }
       } else {
         setQrCode(null);
       }
+
+      // Fetch pairing code if connecting via pairing
+      if (statusData.connecting && statusData.connectionMethod === 'pairing') {
+        try {
+          const pairingData = await botApi.getPairingCode();
+          setPairingCode(pairingData.formatted);
+        } catch {
+          // Code not ready yet
+        }
+      } else if (!statusData.connecting) {
+        setPairingCode(null);
+      }
     } catch (error) {
-      console.error('[Bot Debug] Erro completo ao buscar status:', error);
       setStatus(null);
       setLatency(null);
       setIsApiReachable(false);
-      setApiError(`Não foi possível conectar à API do Bot. Verifique se o serviço está rodando em ${BOT_API_URL}`);
+      setApiError(`Não foi possível conectar à API do Bot.`);
     } finally {
       setLoading(false);
     }
@@ -107,25 +120,78 @@ export function AdminBotManager() {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  const handleConnect = async () => {
+  const handleConnectWithQR = async () => {
     setConnecting(true);
+    setPairingCode(null);
     try {
       await botApi.connect();
       toast({
-        title: 'Conectando...',
+        title: 'Conectando via QR Code...',
         description: 'Aguarde o QR Code aparecer para escanear.',
       });
-      // Wait a bit for QR to generate
       setTimeout(fetchStatus, 2000);
     } catch (error: any) {
-      console.error('[Bot Debug] Erro ao conectar:', error);
       toast({
         title: 'Erro ao conectar',
         description: error.message || 'Não foi possível iniciar a conexão',
+        variant: 'destructive',
+      });
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleConnectWithPairingCode = async () => {
+    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 10) {
+      toast({
+        title: 'Número inválido',
+        description: 'Informe um número de telefone válido com DDD (ex: 5511999999999)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setConnecting(true);
+    setQrCode(null);
+    setPairingCode(null);
+
+    try {
+      await botApi.connectWithPairingCode(phoneNumber.replace(/\D/g, ''));
+      toast({
+        title: 'Solicitando código...',
+        description: 'Aguarde o código de pareamento.',
+      });
+
+      // Polling para obter o código
+      let attempts = 0;
+      const pollCode = setInterval(async () => {
+        attempts++;
+        try {
+          const data = await botApi.getPairingCode();
+          if (data.formatted) {
+            setPairingCode(data.formatted);
+            clearInterval(pollCode);
+          }
+        } catch {
+          if (attempts > 15) {
+            clearInterval(pollCode);
+            toast({
+              title: 'Timeout',
+              description: 'Código não foi gerado. Tente novamente.',
+              variant: 'destructive',
+            });
+          }
+        }
+      }, 1000);
+
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao solicitar código',
+        description: error.message || 'Não foi possível gerar o código',
         variant: 'destructive',
       });
     } finally {
@@ -141,9 +207,9 @@ export function AdminBotManager() {
         title: 'Bot desconectado',
         description: 'A sessão do WhatsApp foi encerrada.',
       });
+      setPairingCode(null);
       fetchStatus();
     } catch (error: any) {
-      console.error('[Bot Debug] Erro ao desconectar:', error);
       toast({
         title: 'Erro ao desconectar',
         description: error.message || 'Não foi possível desconectar',
@@ -160,11 +226,12 @@ export function AdminBotManager() {
       await botApi.clearSession();
       toast({
         title: 'Sessão limpa',
-        description: 'Clique em Conectar para gerar um novo QR Code.',
+        description: 'Escolha um método de conexão para gerar novo código.',
       });
+      setPairingCode(null);
+      setQrCode(null);
       fetchStatus();
     } catch (error: any) {
-      console.error('[Bot Debug] Erro ao limpar sessão:', error);
       toast({
         title: 'Erro ao limpar sessão',
         description: error.message || 'Não foi possível limpar a sessão',
@@ -227,19 +294,9 @@ export function AdminBotManager() {
               <XCircle className="h-6 w-6 text-destructive flex-shrink-0 mt-0.5" />
               <div className="space-y-2">
                 <h3 className="font-semibold text-destructive">API do Bot Inacessível</h3>
-                <p className="text-sm text-muted-foreground">
-                  {apiError}
-                </p>
+                <p className="text-sm text-muted-foreground">{apiError}</p>
                 <div className="text-xs bg-muted p-2 rounded font-mono">
                   URL configurada: {BOT_API_URL}
-                </div>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p><strong>Verifique:</strong></p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Se o container <code className="bg-muted px-1 rounded">whatsapp-bot</code> está rodando</li>
-                    <li>Se a variável <code className="bg-muted px-1 rounded">VITE_BOT_API_URL</code> está correta</li>
-                    <li>Se há conectividade de rede entre o frontend e o bot</li>
-                  </ul>
                 </div>
                 <Button variant="outline" size="sm" onClick={fetchStatus} className="mt-2">
                   <RefreshCw className="h-4 w-4 mr-2" />
@@ -251,7 +308,7 @@ export function AdminBotManager() {
         </Card>
       )}
 
-      {/* Status Cards - Only show if API is reachable */}
+      {/* Status Cards */}
       {isApiReachable && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -322,31 +379,14 @@ export function AdminBotManager() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5" />
+                  <Smartphone className="h-5 w-5" />
                   Conexão WhatsApp
                 </CardTitle>
                 <CardDescription>
-                  Gerencie a conexão do bot com o WhatsApp
+                  Escolha o método de conexão preferido
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* QR Code Display */}
-                {qrCode && !status?.connected && (
-                  <div className="flex flex-col items-center p-4 bg-white rounded-lg border">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Escaneie o QR Code com seu WhatsApp
-                    </p>
-                    <img 
-                      src={qrCode} 
-                      alt="QR Code" 
-                      className="w-64 h-64 border rounded"
-                    />
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Abra o WhatsApp {'>'} Menu {'>'} Dispositivos conectados {'>'} Conectar um dispositivo
-                    </p>
-                  </div>
-                )}
-
                 {/* Connected State */}
                 {status?.connected && (
                   <div className="flex flex-col items-center p-8 bg-success/10 rounded-lg border border-success/30">
@@ -363,71 +403,157 @@ export function AdminBotManager() {
                   </div>
                 )}
 
-                {/* Disconnected State */}
-                {!status?.connected && !qrCode && !status?.connecting && (
-                  <div className="flex flex-col items-center p-8 bg-muted/50 rounded-lg border">
-                    <WifiOff className="h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold">Bot Desconectado</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Clique em conectar para iniciar
-                    </p>
-                  </div>
-                )}
+                {/* Connection Methods (only when disconnected) */}
+                {!status?.connected && (
+                  <Tabs value={connectionMethod} onValueChange={(v) => setConnectionMethod(v as 'code' | 'qr')}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="code" className="flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        Código
+                      </TabsTrigger>
+                      <TabsTrigger value="qr" className="flex items-center gap-2">
+                        <QrCode className="h-4 w-4" />
+                        QR Code
+                      </TabsTrigger>
+                    </TabsList>
 
-                {/* Connecting State */}
-                {status?.connecting && !qrCode && (
-                  <div className="flex flex-col items-center p-8 bg-info/10 rounded-lg border border-info/30">
-                    <Loader2 className="h-16 w-16 text-info animate-spin mb-4" />
-                    <h3 className="text-lg font-semibold text-info">
-                      Conectando...
-                    </h3>
-                    <p className="text-sm text-info/80">
-                      Aguarde o QR Code
-                    </p>
-                  </div>
+                    {/* Pairing Code Tab */}
+                    <TabsContent value="code" className="space-y-4 mt-4">
+                      {!pairingCode && !status?.connecting && (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="phone">Número do WhatsApp</Label>
+                            <Input
+                              id="phone"
+                              placeholder="5511999999999"
+                              value={phoneNumber}
+                              onChange={(e) => setPhoneNumber(e.target.value)}
+                              className="font-mono"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Informe o número com código do país e DDD
+                            </p>
+                          </div>
+                          <Button 
+                            onClick={handleConnectWithPairingCode} 
+                            disabled={connecting}
+                            className="w-full"
+                          >
+                            {connecting ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Hash className="h-4 w-4 mr-2" />
+                            )}
+                            Obter Código
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Pairing Code Display */}
+                      {pairingCode && (
+                        <div className="flex flex-col items-center p-6 bg-success/10 rounded-lg border border-success/30">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Digite este código no WhatsApp:
+                          </p>
+                          <p className="text-4xl font-mono font-bold text-success tracking-widest">
+                            {pairingCode}
+                          </p>
+                          <div className="text-xs text-muted-foreground mt-4 text-center space-y-1">
+                            <p>WhatsApp → <strong>Dispositivos Conectados</strong></p>
+                            <p>→ Conectar Dispositivo → <strong>Usar código</strong></p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Connecting State */}
+                      {status?.connecting && !pairingCode && (
+                        <div className="flex flex-col items-center p-8 bg-info/10 rounded-lg border border-info/30">
+                          <Loader2 className="h-16 w-16 text-info animate-spin mb-4" />
+                          <h3 className="text-lg font-semibold text-info">
+                            Gerando código...
+                          </h3>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    {/* QR Code Tab */}
+                    <TabsContent value="qr" className="space-y-4 mt-4">
+                      {!qrCode && !status?.connecting && (
+                        <div className="flex flex-col items-center p-8 bg-muted/50 rounded-lg border">
+                          <QrCode className="h-16 w-16 text-muted-foreground mb-4" />
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Clique para gerar o QR Code
+                          </p>
+                          <Button 
+                            onClick={handleConnectWithQR} 
+                            disabled={connecting}
+                          >
+                            {connecting ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <QrCode className="h-4 w-4 mr-2" />
+                            )}
+                            Gerar QR Code
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* QR Code Display */}
+                      {qrCode && (
+                        <div className="flex flex-col items-center p-4 bg-white rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Escaneie o QR Code com seu WhatsApp
+                          </p>
+                          <img 
+                            src={qrCode} 
+                            alt="QR Code" 
+                            className="w-64 h-64 border rounded"
+                          />
+                          <p className="text-xs text-muted-foreground mt-3 text-center">
+                            WhatsApp → Menu → Dispositivos conectados → Conectar
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Connecting State */}
+                      {status?.connecting && !qrCode && (
+                        <div className="flex flex-col items-center p-8 bg-info/10 rounded-lg border border-info/30">
+                          <Loader2 className="h-16 w-16 text-info animate-spin mb-4" />
+                          <h3 className="text-lg font-semibold text-info">
+                            Gerando QR Code...
+                          </h3>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 )}
 
                 <Separator />
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-3">
-                  <div className="flex gap-3">
-                    {!status?.connected ? (
-                      <Button 
-                        onClick={handleConnect} 
-                        disabled={connecting || status?.connecting}
-                        className="flex-1"
-                      >
-                        {connecting || status?.connecting ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Power className="h-4 w-4 mr-2" />
-                        )}
-                        Conectar
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="destructive" 
-                        onClick={handleDisconnect}
-                        disabled={disconnecting}
-                        className="flex-1"
-                      >
-                        {disconnecting ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <PowerOff className="h-4 w-4 mr-2" />
-                        )}
-                        Desconectar
-                      </Button>
-                    )}
-                  </div>
+                  {status?.connected && (
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDisconnect}
+                      disabled={disconnecting}
+                      className="w-full"
+                    >
+                      {disconnecting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <PowerOff className="h-4 w-4 mr-2" />
+                      )}
+                      Desconectar
+                    </Button>
+                  )}
 
                   {/* Clear Session Button */}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="w-full border-warning/50 text-warning hover:bg-warning/10 hover:text-warning dark:border-warning/50 dark:text-warning dark:hover:bg-warning/10"
+                        className="w-full border-warning/50 text-warning hover:bg-warning/10 hover:text-warning"
                         disabled={clearingSession}
                       >
                         {clearingSession ? (
@@ -442,26 +568,21 @@ export function AdminBotManager() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Limpar Sessão do WhatsApp?</AlertDialogTitle>
                         <AlertDialogDescription className="space-y-2">
-                          <p>
-                            Esta ação irá:
-                          </p>
+                          <p>Esta ação irá:</p>
                           <ul className="list-disc pl-4 space-y-1 text-sm">
                             <li>Desconectar o dispositivo atual</li>
                             <li>Apagar todas as credenciais salvas</li>
                             <li>Resetar as métricas do bot</li>
-                            <li>Exigir novo escaneamento de QR Code</li>
+                            <li>Exigir nova conexão</li>
                           </ul>
                           <p className="text-warning font-medium mt-3">
-                            Use esta opção se a conexão estiver corrompida ou se deseja conectar outro número.
+                            Use se a conexão estiver com problemas ou para trocar de número.
                           </p>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleClearSession}
-                          className="bg-warning text-warning-foreground hover:bg-warning/90"
-                        >
+                        <AlertDialogAction onClick={handleClearSession}>
                           Limpar Sessão
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -527,22 +648,19 @@ export function AdminBotManager() {
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Clock className="h-4 w-4" />
-                      <span className="text-sm">Tempo Médio</span>
+                      <span className="text-sm">Tempo médio</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {metrics?.averageResponseTime 
-                        ? `${Math.round(metrics.averageResponseTime)}ms` 
-                        : '--'}
+                      {metrics?.averageResponseTime ? `${Math.round(metrics.averageResponseTime)}ms` : '--'}
                     </p>
                   </div>
                 </div>
 
-                {/* Error count */}
-                {metrics && metrics.errors > 0 && (
-                  <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                {metrics?.errors && metrics.errors > 0 && (
+                  <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
                     <div className="flex items-center gap-2 text-destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Erros: {metrics.errors}</span>
+                      <XCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">{metrics.errors} erro(s) registrado(s)</span>
                     </div>
                   </div>
                 )}
@@ -550,41 +668,43 @@ export function AdminBotManager() {
             </Card>
           </div>
 
-          {/* Bot Info */}
+          {/* Bot Features Info */}
           <Card>
             <CardHeader>
-              <CardTitle>Informações do Bot</CardTitle>
+              <CardTitle>Funcionalidades do Bot</CardTitle>
               <CardDescription>
-                Funcionalidades disponíveis via WhatsApp
+                O bot responde automaticamente às seguintes solicitações
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-muted/30 rounded-lg">
-                  <h4 className="font-medium flex items-center gap-2 mb-2">
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-primary" />
-                    Reservas de Quadras
+                    Reserva de Quadras
                   </h4>
                   <p className="text-sm text-muted-foreground">
-                    Usuários podem consultar horários disponíveis e fazer reservas de quadras esportivas.
+                    Usuários podem consultar horários e solicitar reservas de quadras esportivas
                   </p>
                 </div>
-                <div className="p-4 bg-muted/30 rounded-lg">
-                  <h4 className="font-medium flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-primary" />
+
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-warning" />
                     Ocorrências
                   </h4>
                   <p className="text-sm text-muted-foreground">
-                    Moradores podem reportar problemas no bairro que serão triados pela administração.
+                    Moradores podem registrar problemas e ocorrências do bairro
                   </p>
                 </div>
-                <div className="p-4 bg-muted/30 rounded-lg">
-                  <h4 className="font-medium flex items-center gap-2 mb-2">
-                    <Package className="h-4 w-4 text-primary" />
+
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <Package className="h-4 w-4 text-info" />
                     Encomendas
                   </h4>
                   <p className="text-sm text-muted-foreground">
-                    Consulta de encomendas disponíveis para retirada pelo nome do destinatário.
+                    Consulta de encomendas disponíveis para retirada na portaria
                   </p>
                 </div>
               </div>

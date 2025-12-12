@@ -1,32 +1,23 @@
 import makeWASocket, {
   WASocket,
   proto,
+  DisconnectReason,
+  useMultiFileAuthState,
   isJidBroadcast,
   isJidStatusBroadcast,
   isJidNewsletter
-} from '@whiskeysockets/baileys';
-import { useMultiFileAuthState } from '@whiskeysockets/baileys/lib/Utils/use-multi-file-auth-state';
-import type { ConnectionState } from '@whiskeysockets/baileys/lib/Types/State';
+} from 'baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import qrcodeTerminal from 'qrcode-terminal';
-import fs from 'fs';
-import path from 'path';
+import NodeCache from 'node-cache';
 
 import { WAWEB_VERSION, AUTH_FOLDER, MAX_RECONNECT_ATTEMPTS, RECONNECT_DELAY_MS, BOT_NAME } from './config';
 import { badMacHandler } from './utils/badMacHandler';
 
-// DisconnectReason
-const DisconnectReason = {
-  loggedOut: 401,
-  connectionClosed: 428,
-  connectionLost: 408,
-  connectionReplaced: 440,
-  timedOut: 408,
-  restartRequired: 515,
-  badSession: 500
-};
+// Cache para retry de mensagens (igual takeshi-bot)
+const msgRetryCounterCache = new NodeCache();
 
 export interface BotStatus {
   connected: boolean;
@@ -100,6 +91,8 @@ export class WhatsAppBot {
       markOnlineOnConnect: false,
       syncFullHistory: false,
       emitOwnEvents: false,
+      msgRetryCounterCache,
+      shouldSyncHistoryMessage: () => false,
     };
   }
 
@@ -222,7 +215,7 @@ export class WhatsAppBot {
   private setupConnectionHandlers(handler: MessageHandler): void {
     if (!this.sock) return;
 
-    this.sock.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
+    this.sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
       // Handler de QR Code (apenas para modo QR)

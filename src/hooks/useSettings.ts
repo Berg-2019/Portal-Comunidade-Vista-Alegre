@@ -9,15 +9,20 @@ interface SiteSettings {
   cover_image?: string;
 }
 
+// Cache com revalidação (5 minutos)
 let cachedSettings: SiteSettings | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_TTL = 5 * 60 * 1000;
 
 export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(cachedSettings || {});
   const [loading, setLoading] = useState(!cachedSettings);
 
   useEffect(() => {
-    if (cachedSettings) {
-      setSettings(cachedSettings);
+    const isCacheValid = cachedSettings && (Date.now() - cacheTimestamp < CACHE_TTL);
+    
+    if (isCacheValid) {
+      setSettings(cachedSettings!);
       setLoading(false);
       return;
     }
@@ -25,7 +30,9 @@ export function useSettings() {
     const fetchSettings = async () => {
       try {
         const data = await api.getSettings();
+        console.log('📋 Settings carregados:', data);
         cachedSettings = data;
+        cacheTimestamp = Date.now();
         setSettings(data);
       } catch (error) {
         console.error('Erro ao carregar configurações:', error);

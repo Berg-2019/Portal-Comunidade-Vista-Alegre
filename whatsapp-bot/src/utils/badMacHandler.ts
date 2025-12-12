@@ -1,6 +1,13 @@
 /**
- * BadMacHandler - Tratamento inteligente de erros Bad MAC
- * Baseado no takeshi-bot
+ * Utilitário para lidar com erros "Bad MAC"
+ * que são comuns em bots WhatsApp usando Baileys.
+ *
+ * Este módulo fornece funções para detectar, contar
+ * e lidar graciosamente com esses erros.
+ *
+ * Baseado no takeshi-bot (https://github.com/guiireal/takeshi-bot)
+ * @author Dev Gui (estrutura original)
+ * @adapted Vista Alegre Portal
  */
 
 import fs from 'node:fs';
@@ -14,20 +21,19 @@ class BadMacHandler {
   private lastReset: number = Date.now();
 
   /**
-   * Detectar erro Bad MAC
+   * Detecta se é um erro Bad MAC
    */
   isBadMacError(error: any): boolean {
     const errorMessage = error?.message || error?.toString() || '';
     return (
       errorMessage.includes('Bad MAC') ||
       errorMessage.includes('MAC verification failed') ||
-      errorMessage.includes('decryption failed') ||
-      errorMessage.includes('hmac mismatch')
+      errorMessage.includes('decryption failed')
     );
   }
 
   /**
-   * Detectar erro de sessão
+   * Detecta se é um erro de sessão
    */
   isSessionError(error: any): boolean {
     const errorMessage = error?.message || error?.toString() || '';
@@ -35,56 +41,39 @@ class BadMacHandler {
       errorMessage.includes('Session') ||
       errorMessage.includes('signal protocol') ||
       errorMessage.includes('decrypt') ||
-      errorMessage.includes('auth') ||
       this.isBadMacError(error)
     );
   }
 
   /**
-   * Limpar APENAS arquivos problemáticos (preservar creds.json)
+   * Limpa arquivos de sessão problemáticos (preserva credenciais)
    */
   clearProblematicSessionFiles(): boolean {
     try {
-      const authFolder = path.resolve(process.cwd(), AUTH_FOLDER);
+      const baileysFolder = path.resolve(process.cwd(), AUTH_FOLDER);
 
-      if (!fs.existsSync(authFolder)) {
-        console.log('📁 Pasta auth_info não existe, nada a limpar');
+      if (!fs.existsSync(baileysFolder)) {
         return false;
       }
 
-      const files = fs.readdirSync(authFolder);
+      const files = fs.readdirSync(baileysFolder);
       let removedCount = 0;
 
-      // Arquivos essenciais que devem ser PRESERVADOS
-      const preservePatterns = [
-        'creds.json',
-        'app-state-sync-key',
-        'app-state-sync-version'
-      ];
-
-      // Arquivos problemáticos que devem ser REMOVIDOS
-      const removePatterns = [
-        'session-',
-        'pre-key-',
-        'sender-key-',
-        'sender-key-memory'
-      ];
-
       for (const file of files) {
-        const filePath = path.join(authFolder, file);
+        const filePath = path.join(baileysFolder, file);
         
-        if (!fs.statSync(filePath).isFile()) continue;
+        if (fs.statSync(filePath).isFile()) {
+          // Preservar arquivos essenciais
+          if (
+            file.includes('app-state-sync-key') ||
+            file === 'creds.json' ||
+            file.includes('app-state-sync-version')
+          ) {
+            console.log(`✅ Preservando: ${file}`);
+            continue;
+          }
 
-        // Verificar se deve preservar
-        const shouldPreserve = preservePatterns.some(pattern => file.includes(pattern));
-        if (shouldPreserve) {
-          console.log(`✅ Preservando: ${file}`);
-          continue;
-        }
-
-        // Verificar se deve remover
-        const shouldRemove = removePatterns.some(pattern => file.includes(pattern));
-        if (shouldRemove) {
+          // Remover arquivos problemáticos
           try {
             fs.unlinkSync(filePath);
             removedCount++;
@@ -96,83 +85,39 @@ class BadMacHandler {
       }
 
       if (removedCount > 0) {
-        console.log(`⚠️ ${removedCount} arquivos problemáticos removidos. Credenciais preservadas.`);
+        console.log(`⚠️ ${removedCount} arquivos de sessão problemáticos removidos. Credenciais preservadas.`);
         return true;
       }
 
-      console.log('📁 Nenhum arquivo problemático encontrado');
       return false;
     } catch (error: any) {
-      console.error(`❌ Erro ao limpar arquivos: ${error.message}`);
+      console.error(`❌ Erro ao limpar arquivos de sessão: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * Limpar TODA a sessão (quando necessário reconectar do zero)
+   * Limpa toda a sessão (para reconexão completa)
    */
   clearAllSessionFiles(): boolean {
     try {
-      const authFolder = path.resolve(process.cwd(), AUTH_FOLDER);
+      const baileysFolder = path.resolve(process.cwd(), AUTH_FOLDER);
 
-      if (!fs.existsSync(authFolder)) {
+      if (!fs.existsSync(baileysFolder)) {
         return false;
       }
 
-      fs.rmSync(authFolder, { recursive: true, force: true });
+      fs.rmSync(baileysFolder, { recursive: true, force: true });
       console.log('🗑️ Toda a sessão foi removida');
       return true;
     } catch (error: any) {
-      console.error(`❌ Erro ao limpar sessão completa: ${error.message}`);
+      console.error(`❌ Erro ao limpar sessão: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * Limpar sessão com retry e delay (para evitar EBUSY)
-   */
-  async clearAllSessionFilesWithRetry(maxRetries: number = 3): Promise<boolean> {
-    const authFolder = path.resolve(process.cwd(), AUTH_FOLDER);
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        if (!fs.existsSync(authFolder)) {
-          console.log('📁 Pasta auth_info não existe, nada a limpar');
-          return true;
-        }
-
-        // Deletar arquivos individualmente primeiro
-        const files = fs.readdirSync(authFolder);
-        for (const file of files) {
-          const filePath = path.join(authFolder, file);
-          try {
-            if (fs.statSync(filePath).isFile()) {
-              fs.unlinkSync(filePath);
-            }
-          } catch (err) {
-            // Ignorar erros em arquivos individuais
-          }
-        }
-
-        // Tentar remover pasta vazia
-        fs.rmdirSync(authFolder);
-        console.log('🗑️ Toda a sessão foi removida com sucesso');
-        return true;
-      } catch (error: any) {
-        if (attempt < maxRetries - 1) {
-          console.log(`⏳ Aguardando liberação de arquivos... (tentativa ${attempt + 1}/${maxRetries})`);
-          await new Promise(r => setTimeout(r, 1000));
-        } else {
-          console.error(`❌ Não foi possível limpar sessão após ${maxRetries} tentativas: ${error.message}`);
-          return false;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Incrementar contador de erros
+   * Incrementa contador de erros
    */
   incrementErrorCount(): void {
     this.errorCount++;
@@ -186,7 +131,7 @@ class BadMacHandler {
   }
 
   /**
-   * Resetar contador
+   * Reseta contador de erros
    */
   resetErrorCount(): void {
     const previousCount = this.errorCount;
@@ -194,41 +139,58 @@ class BadMacHandler {
     this.lastReset = Date.now();
 
     if (previousCount > 0) {
-      console.log(`✅ Reset do contador Bad MAC. Anterior: ${previousCount}`);
+      console.log(`✅ Reset do contador de Bad MAC errors. Contador anterior: ${previousCount}`);
     }
   }
 
   /**
-   * Verificar se atingiu limite
+   * Verifica se atingiu limite
    */
   hasReachedLimit(): boolean {
     return this.errorCount >= this.maxRetries;
   }
 
   /**
-   * Handler principal de erros
+   * Handler principal de erros Bad MAC
    */
   handleError(error: any, context: string = 'unknown'): boolean {
-    if (!this.isBadMacError(error) && !this.isSessionError(error)) {
+    if (!this.isBadMacError(error)) {
       return false;
     }
 
-    console.log(`❌ Erro de sessão em ${context}: ${error?.message || error}`);
+    console.log(`❌ Bad MAC error detectado em ${context}: ${error?.message || error}`);
     this.incrementErrorCount();
 
     if (this.hasReachedLimit()) {
-      console.log(`🔄 Limite de erros atingido (${this.maxRetries}). Limpando arquivos problemáticos...`);
-      this.clearProblematicSessionFiles();
-      this.resetErrorCount();
+      console.log(`⚠️ Limite de Bad MAC errors atingido (${this.maxRetries}). Considere reiniciar o bot.`);
       return true;
     }
 
-    console.log(`⏳ Ignorando erro temporário (${this.errorCount}/${this.maxRetries})...`);
+    console.log(`⏳ Ignorando Bad MAC error e continuando operação... (${this.errorCount}/${this.maxRetries})`);
     return true;
   }
 
   /**
-   * Estatísticas
+   * Wrapper para funções com tratamento de Bad MAC
+   */
+  createSafeWrapper<T extends (...args: any[]) => Promise<any>>(
+    fn: T,
+    context: string
+  ): T {
+    return (async (...args: any[]) => {
+      try {
+        return await fn(...args);
+      } catch (error) {
+        if (this.handleError(error, context)) {
+          return null;
+        }
+        throw error;
+      }
+    }) as T;
+  }
+
+  /**
+   * Estatísticas do handler
    */
   getStats(): object {
     return {

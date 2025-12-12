@@ -1,4 +1,4 @@
-import { WASocket } from '@whiskeysockets/baileys';
+import { WASocket } from 'baileys';
 import { ApiClient } from '../services/apiClient';
 import { SessionManager, UserSession } from '../services/sessionManager';
 import { MessageTemplates } from '../utils/messageTemplates';

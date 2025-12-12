@@ -325,7 +325,7 @@ export class WhatsAppBot {
 
     this.sock.ev.on('messages.upsert', async ({ messages }: { messages: proto.IWebMessageInfo[] }) => {
       for (const msg of messages) {
-        if (!msg.key.fromMe && msg.message) {
+        if (msg.key && !msg.key.fromMe && msg.message) {
           this.metrics.messagesReceived++;
           const startTime = Date.now();
 

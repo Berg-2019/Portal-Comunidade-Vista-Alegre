@@ -59,8 +59,21 @@ router.get('/:id/slots', async (req: Request, res: Response) => {
 
     queryText += ' ORDER BY day_of_week, start_time';
 
-    const result = await query(queryText, params);
-    res.json(result.rows);
+    const slotsResult = await query(queryText, params);
+    
+    // Buscar períodos de manutenção ativos
+    const maintenanceResult = await query(
+      `SELECT * FROM court_maintenance_periods 
+       WHERE court_id = $1 AND end_date >= CURRENT_DATE 
+       ORDER BY start_date`,
+      [id]
+    );
+
+    // Retornar no formato esperado pelo frontend
+    res.json({
+      slots: slotsResult.rows,
+      maintenancePeriods: maintenanceResult.rows
+    });
   } catch (error) {
     console.error('Error fetching slots:', error);
     res.status(500).json({ error: 'Error fetching slots' });

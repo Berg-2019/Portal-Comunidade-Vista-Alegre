@@ -106,16 +106,23 @@ export default function Sobre() {
               Entre em contato para sugestões, dúvidas ou para se voluntariar.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <a
-                href={getWhatsAppLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button className="w-full sm:w-auto">
+              {getWhatsAppLink() ? (
+                <a
+                  href={getWhatsAppLink()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button className="w-full sm:w-auto">
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    WhatsApp
+                  </Button>
+                </a>
+              ) : (
+                <Button className="w-full sm:w-auto" disabled>
                   <MessageCircle className="h-4 w-4 mr-2" />
                   WhatsApp
                 </Button>
-              </a>
+              )}
               <a href="mailto:contato@minhavistaalegre.com.br">
                 <Button variant="outline" className="w-full sm:w-auto">
                   <Mail className="h-4 w-4 mr-2" />

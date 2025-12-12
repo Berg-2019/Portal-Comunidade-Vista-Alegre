@@ -37,10 +37,11 @@ export function useSettings() {
     fetchSettings();
   }, []);
 
-  const getWhatsAppLink = (message?: string) => {
+  const getWhatsAppLink = (message?: string): string | undefined => {
     const number = settings.whatsapp_number || '';
-    if (!number) return '#';
+    if (!number) return undefined;
     const cleanNumber = number.replace(/\D/g, '');
+    if (!cleanNumber) return undefined;
     if (message) {
       return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
     }

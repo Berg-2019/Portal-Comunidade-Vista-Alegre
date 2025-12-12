@@ -193,10 +193,18 @@ export class WhatsAppBot {
 
     this.sock = socket;
 
-    // Solicitar pairing code se não registrado (estrutura takeshi-bot)
+    // Flag para controlar pairing em progresso
+    let pairingInProgress = false;
+
+    // Salvar credenciais ANTES de tudo
+    socket.ev.on('creds.update', saveCreds);
+
+    // Solicitar pairing code ANTES de registrar connection.update handler
     if (!socket.authState.creds.registered) {
       if (this.connectionMethod === 'pairing' && this.pendingPhoneNumber) {
         warningLog('Credenciais ainda não configuradas!');
+        
+        pairingInProgress = true;
         
         // Aguardar 5 segundos para socket WebSocket estar pronto
         infoLog('Aguardando socket ficar pronto (5 segundos)...');
@@ -210,6 +218,7 @@ export class WhatsAppBot {
           sayLog(`Código de pareamento: ${code}`);
         } catch (err: any) {
           errorLog(`Falha ao gerar código de pareamento: ${err.message}`);
+          pairingInProgress = false;
           this.connecting = false;
           throw new Error('Falha ao gerar código de pareamento. Verifique o número.');
         }
@@ -218,7 +227,7 @@ export class WhatsAppBot {
       }
     }
 
-    // Handler de conexão (estrutura 100% takeshi-bot)
+    // Handler de conexão COM PROTEÇÃO para pairing
     socket.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
@@ -233,11 +242,23 @@ export class WhatsAppBot {
       }
 
       if (connection === 'close') {
-        this.connected = false;
-        this.connecting = false;
-
         const error = lastDisconnect?.error as any;
         const statusCode = error?.output?.statusCode;
+
+        // SE PAIRING EM PROGRESSO, IGNORAR EVENTOS DE CLOSE NORMAIS DO HANDSHAKE
+        if (pairingInProgress) {
+          // 428 = Precondition Required (normal durante pairing)
+          // 401 = Unauthorized (normal durante handshake)
+          // undefined = Sem código (normal durante pairing)
+          if (statusCode === 428 || statusCode === 401 || statusCode === undefined) {
+            infoLog('Pareamento em progresso, aguardando confirmação no WhatsApp...');
+            return; // NÃO RECONECTAR - aguardar usuário digitar código
+          }
+        }
+
+        this.connected = false;
+        this.connecting = false;
+        pairingInProgress = false;
 
         // Tratamento de Bad MAC (igual takeshi-bot)
         if (
@@ -314,6 +335,7 @@ export class WhatsAppBot {
 
         this.connected = true;
         this.connecting = false;
+        pairingInProgress = false; // Pairing completado com sucesso
         this.qrCode = null;
         this.pairingCode = null;
         this.lastConnected = new Date();
@@ -327,9 +349,6 @@ export class WhatsAppBot {
         infoLog('Atualizando conexão...');
       }
     });
-
-    // Salvar credenciais
-    socket.ev.on('creds.update', saveCreds);
 
     // Handler de mensagens
     socket.ev.on('messages.upsert', async ({ messages }) => {

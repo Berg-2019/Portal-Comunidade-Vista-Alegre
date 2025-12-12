@@ -55,6 +55,7 @@ export class WhatsAppBot {
   private shouldReconnect: boolean = false;
   private connectionMethod: 'qr' | 'pairing' | null = null;
   private pendingPhoneNumber: string | null = null;
+  private pairingInProgress: boolean = false; // Flag para ignorar erros durante pareamento
 
   // Reconnection control
   private reconnectAttempts: number = 0;
@@ -142,10 +143,12 @@ export class WhatsAppBot {
         try {
           const code = await this.sock.requestPairingCode(cleanNumber);
           this.pairingCode = code;
+          this.pairingInProgress = true; // Marcar que pareamento está em progresso
           console.log(`✅ Código de pareamento gerado: ${code}`);
         } catch (err: any) {
           console.error('❌ Erro ao solicitar código de pareamento:', err.message);
           this.connecting = false;
+          this.pairingInProgress = false;
           throw new Error('Falha ao gerar código de pareamento. Verifique o número.');
         }
       }
@@ -255,6 +258,18 @@ export class WhatsAppBot {
           this.reconnectTimeout = null;
         }
 
+        // Se pareamento está em progresso, ignorar erros transitórios (401, 428, undefined)
+        if (this.pairingInProgress && (reason === 401 || reason === 428 || reason === undefined)) {
+          console.log('⏳ Pareamento em progresso, aguardando confirmação do WhatsApp...');
+          // Reconectar sem limpar sessão para continuar o handshake
+          this.reconnectTimeout = setTimeout(() => {
+            if (this.pendingPhoneNumber) {
+              this.connectWithPairingCode(this.pendingPhoneNumber, handler);
+            }
+          }, 3000);
+          return;
+        }
+
         // Verificar se é erro Bad MAC ou de sessão
         if (badMacHandler.handleError(lastDisconnect?.error, 'connection.update')) {
           if (badMacHandler.hasReachedLimit()) {
@@ -277,10 +292,12 @@ export class WhatsAppBot {
           this.pairingCode = null;
           this.shouldReconnect = false;
           this.reconnectAttempts = 0;
+          this.pairingInProgress = false;
           badMacHandler.clearAllSessionFiles();
         } else if (reason === 401 || reason === DisconnectReason.badSession) {
           console.log('🔒 Erro de autenticação. Limpando sessão...');
           this.shouldReconnect = false;
+          this.pairingInProgress = false;
           badMacHandler.clearAllSessionFiles();
           console.log('✅ Sessão removida. Reinicie a conexão.');
         } else if (this.shouldReconnect && handler) {
@@ -310,6 +327,7 @@ export class WhatsAppBot {
         this.connecting = false;
         this.qrCode = null;
         this.pairingCode = null;
+        this.pairingInProgress = false; // Pareamento concluído com sucesso
         this.lastConnected = new Date();
         this.startTime = new Date();
         this.phoneNumber = this.sock?.user?.id?.split(':')[0] || null;

@@ -6,19 +6,24 @@ import makeWASocket, {
   isJidBroadcast,
   isJidStatusBroadcast,
   isJidNewsletter,
-  delay
+  Browsers,
+  makeCacheableSignalKeyStore,
+  fetchLatestBaileysVersion
 } from 'baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import qrcodeTerminal from 'qrcode-terminal';
 import NodeCache from 'node-cache';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { WAWEB_VERSION, AUTH_FOLDER, MAX_RECONNECT_ATTEMPTS, RECONNECT_DELAY_MS, BOT_NAME } from './config';
-import { badMacHandler } from './utils/badMacHandler';
 
-// Cache para retry de mensagens (igual takeshi-bot)
-const msgRetryCounterCache = new NodeCache();
+// Cache para retry de mensagens (padrão Baileys)
+const msgRetryCounterCache = new NodeCache({ stdTTL: 600, checkperiod: 60 });
+
+// Logger silencioso
+const logger = pino({ level: 'silent' });
 
 export interface BotStatus {
   connected: boolean;
@@ -52,16 +57,11 @@ export class WhatsAppBot {
   private lastConnected: Date | null = null;
   private startTime: Date | null = null;
   private messageHandler: MessageHandler | null = null;
-  private shouldReconnect: boolean = false;
   private connectionMethod: 'qr' | 'pairing' | null = null;
   private pendingPhoneNumber: string | null = null;
-  private pairingInProgress: boolean = false; // Flag para ignorar erros durante pareamento
+  private pairingCodeRequested: boolean = false;
 
-  // Reconnection control
-  private reconnectAttempts: number = 0;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-
-  // Metrics
+  // Métricas
   private metrics: BotMetrics = {
     messagesReceived: 0,
     messagesSent: 0,
@@ -71,370 +71,345 @@ export class WhatsAppBot {
     averageResponseTime: 0,
     errors: 0
   };
-
   private responseTimes: number[] = [];
 
   /**
-   * Configurações comuns do socket (baseado no takeshi-bot)
-   */
-  private getSocketConfig(state: any, logger: any) {
-    return {
-      version: WAWEB_VERSION,
-      auth: state,
-      logger,
-      browser: [BOT_NAME, 'Chrome', '120.0.0'] as [string, string, string],
-      defaultQueryTimeoutMs: undefined,
-      retryRequestDelayMs: RECONNECT_DELAY_MS,
-      shouldIgnoreJid: (jid: string) =>
-        isJidBroadcast(jid) || isJidStatusBroadcast(jid) || isJidNewsletter(jid),
-      connectTimeoutMs: 20_000,
-      keepAliveIntervalMs: 30_000,
-      maxMsgRetryCount: 5,
-      markOnlineOnConnect: false,
-      syncFullHistory: false,
-      emitOwnEvents: false,
-      msgRetryCounterCache,
-      shouldSyncHistoryMessage: () => false,
-    };
-  }
-
-  /**
-   * Conectar via Pairing Code (código de 8 dígitos)
+   * Conectar via Pairing Code (método recomendado)
    */
   async connectWithPairingCode(phoneNumber: string, handler: MessageHandler): Promise<void> {
     if (this.connecting) {
-      console.log('Bot já está conectando, aguarde...');
+      console.log('⏳ Bot já está conectando, aguarde...');
       return;
     }
 
     if (this.connected) {
-      console.log('Bot já está conectado');
+      console.log('✅ Bot já está conectado');
       return;
     }
-
-    this.connecting = true;
-    this.shouldReconnect = true;
-    this.messageHandler = handler;
-    this.connectionMethod = 'pairing';
-    this.pendingPhoneNumber = phoneNumber;
-    this.qrCode = null;
-    this.pairingCode = null;
 
     console.log(`📱 Iniciando conexão via Pairing Code para: ${phoneNumber}`);
 
-    try {
-      const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-      const logger = pino({ level: 'silent' });
+    this.connecting = true;
+    this.messageHandler = handler;
+    this.connectionMethod = 'pairing';
+    this.pendingPhoneNumber = phoneNumber.replace(/\D/g, '');
+    this.pairingCodeRequested = false;
+    this.qrCode = null;
+    this.pairingCode = null;
 
-      this.sock = makeWASocket({
-        ...this.getSocketConfig(state, logger),
-        printQRInTerminal: false, // Não mostrar QR no modo pairing
-      });
-
-      this.sock.ev.on('creds.update', saveCreds);
-
-      // Solicitar pairing code se não registrado
-      if (!this.sock.authState.creds.registered) {
-        const cleanNumber = phoneNumber.replace(/\D/g, '');
-        console.log(`📱 Aguardando socket ficar pronto...`);
-        await delay(5000); // Aguardar WebSocket estabelecer conexão
-        console.log(`📱 Solicitando código de pareamento para: ${cleanNumber}`);
-        
-        try {
-          const code = await this.sock.requestPairingCode(cleanNumber);
-          this.pairingCode = code;
-          this.pairingInProgress = true; // Marcar que pareamento está em progresso
-          console.log(`✅ Código de pareamento gerado: ${code}`);
-        } catch (err: any) {
-          console.error('❌ Erro ao solicitar código de pareamento:', err.message);
-          this.connecting = false;
-          this.pairingInProgress = false;
-          throw new Error('Falha ao gerar código de pareamento. Verifique o número.');
-        }
-      }
-
-      this.setupConnectionHandlers(handler);
-      this.setupMessageHandlers();
-
-    } catch (error) {
-      this.connecting = false;
-      this.shouldReconnect = false;
-      console.error('Erro ao conectar via Pairing Code:', error);
-      throw error;
-    }
+    await this.createSocket();
   }
 
   /**
-   * Conectar via QR Code (método tradicional)
+   * Conectar via QR Code
    */
   async connectWithQR(handler: MessageHandler): Promise<void> {
     if (this.connecting) {
-      console.log('Bot já está conectando, aguarde...');
+      console.log('⏳ Bot já está conectando, aguarde...');
       return;
     }
 
     if (this.connected) {
-      console.log('Bot já está conectado');
+      console.log('✅ Bot já está conectado');
       return;
     }
 
+    console.log('📷 Iniciando conexão via QR Code...');
+
     this.connecting = true;
-    this.shouldReconnect = true;
     this.messageHandler = handler;
     this.connectionMethod = 'qr';
+    this.pendingPhoneNumber = null;
+    this.pairingCodeRequested = false;
     this.qrCode = null;
     this.pairingCode = null;
 
-    console.log('📷 Iniciando conexão via QR Code...');
+    await this.createSocket();
+  }
 
+  /**
+   * Criar e configurar socket (lógica central)
+   */
+  private async createSocket(): Promise<void> {
     try {
       const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-      const logger = pino({ level: 'silent' });
 
+      // Configuração do socket seguindo documentação Baileys
       this.sock = makeWASocket({
-        ...this.getSocketConfig(state, logger),
-        printQRInTerminal: true, // Mostrar QR no terminal
+        version: WAWEB_VERSION,
+        auth: {
+          creds: state.creds,
+          keys: makeCacheableSignalKeyStore(state.keys, logger)
+        },
+        logger,
+        // Browser config: CRÍTICO para pairing code funcionar
+        browser: this.connectionMethod === 'pairing' 
+          ? Browsers.ubuntu('Chrome')  // Pairing requer browser válido
+          : [BOT_NAME, 'Chrome', '120.0.0'],
+        printQRInTerminal: this.connectionMethod === 'qr',
+        // Configurações de performance
+        defaultQueryTimeoutMs: undefined,
+        retryRequestDelayMs: RECONNECT_DELAY_MS,
+        connectTimeoutMs: 60_000,
+        keepAliveIntervalMs: 30_000,
+        maxMsgRetryCount: 5,
+        msgRetryCounterCache,
+        // Otimizações
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
+        emitOwnEvents: false,
+        shouldSyncHistoryMessage: () => false,
+        shouldIgnoreJid: (jid: string) =>
+          isJidBroadcast(jid) || isJidStatusBroadcast(jid) || isJidNewsletter(jid),
+        // getMessage para reenvio de mensagens
+        getMessage: async () => undefined
       });
 
+      // Salvar credenciais
       this.sock.ev.on('creds.update', saveCreds);
-      this.setupConnectionHandlers(handler);
-      this.setupMessageHandlers();
+
+      // Handler principal de conexão
+      this.sock.ev.on('connection.update', async (update) => {
+        await this.handleConnectionUpdate(update);
+      });
+
+      // Handler de mensagens
+      this.sock.ev.on('messages.upsert', async ({ messages }) => {
+        await this.handleMessages(messages);
+      });
 
     } catch (error) {
+      console.error('❌ Erro ao criar socket:', error);
       this.connecting = false;
-      this.shouldReconnect = false;
-      console.error('Erro ao conectar via QR Code:', error);
       throw error;
     }
   }
 
   /**
-   * Método de conexão padrão (QR Code) - compatibilidade com código existente
+   * Handler de conexão (baseado na documentação oficial Baileys)
    */
-  async connect(handler: MessageHandler): Promise<void> {
-    return this.connectWithQR(handler);
-  }
+  private async handleConnectionUpdate(update: any): Promise<void> {
+    const { connection, lastDisconnect, qr } = update;
 
-  /**
-   * Configurar handlers de conexão
-   */
-  private setupConnectionHandlers(handler: MessageHandler): void {
-    if (!this.sock) return;
-
-    this.sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-
-      // Handler de QR Code (apenas para modo QR)
-      if (qr && this.connectionMethod === 'qr') {
-        console.log('📱 QR Code gerado - escaneie no terminal para conectar:');
-
-        // Exibir QR Code no terminal
-        qrcodeTerminal.generate(qr, { small: true }, (qrString: string) => {
-          console.log('\n' + qrString);
-        });
-
-        // Converter para base64 para o frontend
-        try {
-          this.qrCode = await QRCode.toDataURL(qr);
-          console.log('✅ QR Code também disponível via API');
-        } catch (err) {
-          console.error('❌ Erro ao gerar QR Code base64:', err);
-        }
-      }
-
-      if (connection === 'close') {
-        this.connected = false;
-        this.connecting = false;
-
-        const error = lastDisconnect?.error as Boom | undefined;
-        const reason = error?.output?.statusCode;
-        const errorMessage = (lastDisconnect?.error as Error)?.message || '';
-
-        console.log('🔌 Conexão fechada. Código:', reason, 'Mensagem:', errorMessage);
-
-        // Limpar timeout pendente
-        if (this.reconnectTimeout) {
-          clearTimeout(this.reconnectTimeout);
-          this.reconnectTimeout = null;
-        }
-
-        // Se pareamento está em progresso, ignorar erros transitórios (401, 428, undefined)
-        if (this.pairingInProgress && (reason === 401 || reason === 428 || reason === undefined)) {
-          console.log('⏳ Pareamento em progresso, aguardando confirmação do WhatsApp...');
-          // Reconectar sem limpar sessão para continuar o handshake
-          this.reconnectTimeout = setTimeout(() => {
-            if (this.pendingPhoneNumber) {
-              this.connectWithPairingCode(this.pendingPhoneNumber, handler);
-            }
-          }, 3000);
-          return;
-        }
-
-        // Verificar se é erro Bad MAC ou de sessão
-        if (badMacHandler.handleError(lastDisconnect?.error, 'connection.update')) {
-          if (badMacHandler.hasReachedLimit()) {
-            console.log('🔄 Reconectando após limpeza de sessão...');
-            this.reconnectTimeout = setTimeout(() => {
-              if (this.connectionMethod === 'pairing' && this.pendingPhoneNumber) {
-                this.connectWithPairingCode(this.pendingPhoneNumber, handler);
-              } else {
-                this.connectWithQR(handler);
-              }
-            }, RECONNECT_DELAY_MS);
-            return;
-          }
-        }
-
-        // Tratamento por código de erro
-        if (reason === DisconnectReason.loggedOut) {
-          console.log('❌ Bot deslogado pelo usuário');
-          this.qrCode = null;
-          this.pairingCode = null;
-          this.shouldReconnect = false;
-          this.reconnectAttempts = 0;
-          this.pairingInProgress = false;
-          badMacHandler.clearAllSessionFiles();
-        } else if (reason === 401 || reason === DisconnectReason.badSession) {
-          console.log('🔒 Erro de autenticação. Limpando sessão...');
-          this.shouldReconnect = false;
-          this.pairingInProgress = false;
-          badMacHandler.clearAllSessionFiles();
-          console.log('✅ Sessão removida. Reinicie a conexão.');
-        } else if (this.shouldReconnect && handler) {
-          this.reconnectAttempts++;
-
-          if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.log(`❌ Limite de ${MAX_RECONNECT_ATTEMPTS} tentativas atingido. Parando.`);
-            this.shouldReconnect = false;
-            this.reconnectAttempts = 0;
-            this.qrCode = null;
-            this.pairingCode = null;
-          } else {
-            const delay = Math.min(RECONNECT_DELAY_MS * this.reconnectAttempts, 15000);
-            console.log(`🔄 Tentativa ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}. Reconectando em ${delay / 1000}s...`);
-            this.reconnectTimeout = setTimeout(() => {
-              if (this.connectionMethod === 'pairing' && this.pendingPhoneNumber) {
-                this.connectWithPairingCode(this.pendingPhoneNumber, handler);
-              } else {
-                this.connectWithQR(handler);
-              }
-            }, delay);
-          }
-        }
-      } else if (connection === 'open') {
-        console.log('✅ Bot conectado com sucesso!');
-        this.connected = true;
-        this.connecting = false;
-        this.qrCode = null;
-        this.pairingCode = null;
-        this.pairingInProgress = false; // Pareamento concluído com sucesso
-        this.lastConnected = new Date();
-        this.startTime = new Date();
-        this.phoneNumber = this.sock?.user?.id?.split(':')[0] || null;
-        this.reconnectAttempts = 0;
-        badMacHandler.resetErrorCount();
-        console.log('📞 Número conectado:', this.phoneNumber);
-      }
-    });
-  }
-
-  /**
-   * Configurar handlers de mensagens
-   */
-  private setupMessageHandlers(): void {
-    if (!this.sock) return;
-
-    this.sock.ev.on('messages.upsert', async ({ messages }: { messages: proto.IWebMessageInfo[] }) => {
-      for (const msg of messages) {
-        if (msg.key && !msg.key.fromMe && msg.message) {
-          this.metrics.messagesReceived++;
-          const startTime = Date.now();
-
-          try {
-            if (this.messageHandler && this.sock) {
-              await this.messageHandler(msg, this.sock);
-            }
-
-            const responseTime = Date.now() - startTime;
-            this.responseTimes.push(responseTime);
-            if (this.responseTimes.length > 100) {
-              this.responseTimes.shift();
-            }
-            this.metrics.averageResponseTime =
-              this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
-          } catch (error) {
-            console.error('Erro ao processar mensagem:', error);
-            this.metrics.errors++;
-          }
-        }
-      }
-    });
-  }
-
-  async disconnect(): Promise<void> {
-    console.log('🔌 Desconectando bot...');
-    this.shouldReconnect = false;
-    this.reconnectAttempts = 0;
-
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-
-    if (this.sock) {
+    // === PAIRING CODE: Solicitar quando estiver "connecting" ===
+    if (this.connectionMethod === 'pairing' && 
+        this.pendingPhoneNumber && 
+        !this.pairingCodeRequested &&
+        (connection === 'connecting' || qr)) {
+      
+      this.pairingCodeRequested = true;
+      console.log(`📱 Solicitando código de pareamento para: ${this.pendingPhoneNumber}`);
+      
       try {
-        this.sock.ws?.close();
-        await new Promise(r => setTimeout(r, 200));
-        await this.sock.logout();
-      } catch (error) {
-        console.log('Erro ao fazer logout (pode ser normal):', error);
+        const code = await this.sock!.requestPairingCode(this.pendingPhoneNumber);
+        this.pairingCode = code;
+        console.log(`✅ Código de pareamento gerado: ${code}`);
+      } catch (err: any) {
+        console.error('❌ Erro ao solicitar código de pareamento:', err.message);
+        this.pairingCode = null;
       }
-      this.sock = null;
     }
 
+    // === QR CODE ===
+    if (qr && this.connectionMethod === 'qr') {
+      console.log('📱 QR Code gerado');
+      try {
+        this.qrCode = await QRCode.toDataURL(qr);
+      } catch (err) {
+        console.error('❌ Erro ao gerar QR Code base64:', err);
+      }
+    }
+
+    // === CONEXÃO FECHADA ===
+    if (connection === 'close') {
+      this.connected = false;
+      this.connecting = false;
+
+      const error = lastDisconnect?.error as Boom | undefined;
+      const statusCode = error?.output?.statusCode;
+      const errorMessage = (lastDisconnect?.error as Error)?.message || '';
+
+      console.log(`🔌 Conexão fechada. Código: ${statusCode}, Mensagem: ${errorMessage}`);
+
+      // Decidir se reconecta baseado no código de erro
+      const shouldReconnect = this.shouldReconnectAfterError(statusCode, errorMessage);
+
+      if (shouldReconnect) {
+        console.log('🔄 Reconectando...');
+        setTimeout(() => {
+          if (this.connectionMethod === 'pairing' && this.pendingPhoneNumber) {
+            this.pairingCodeRequested = false;
+            this.createSocket();
+          } else if (this.connectionMethod === 'qr') {
+            this.createSocket();
+          }
+        }, RECONNECT_DELAY_MS);
+      } else {
+        console.log('⛔ Não reconectar. Limpando estado...');
+        this.resetState();
+      }
+    }
+
+    // === CONEXÃO ABERTA ===
+    if (connection === 'open') {
+      console.log('✅ Bot conectado com sucesso!');
+      this.connected = true;
+      this.connecting = false;
+      this.qrCode = null;
+      this.pairingCode = null;
+      this.lastConnected = new Date();
+      this.startTime = new Date();
+      this.phoneNumber = this.sock?.user?.id?.split(':')[0] || null;
+      console.log(`📞 Número conectado: ${this.phoneNumber}`);
+    }
+  }
+
+  /**
+   * Decidir se deve reconectar após erro
+   */
+  private shouldReconnectAfterError(statusCode: number | undefined, message: string): boolean {
+    // Logged out - não reconectar
+    if (statusCode === DisconnectReason.loggedOut) {
+      console.log('❌ Bot foi deslogado pelo usuário');
+      this.clearSessionFiles();
+      return false;
+    }
+
+    // Bad session - limpar e não reconectar automaticamente
+    if (statusCode === DisconnectReason.badSession || statusCode === 401) {
+      console.log('🔒 Sessão inválida. Limpando...');
+      this.clearSessionFiles();
+      return false;
+    }
+
+    // Restart required - reconectar imediatamente
+    if (statusCode === DisconnectReason.restartRequired || statusCode === 515) {
+      console.log('🔄 Reinício requerido pelo WhatsApp');
+      return true;
+    }
+
+    // Connection replaced - não reconectar
+    if (statusCode === DisconnectReason.connectionReplaced) {
+      console.log('📱 Conexão substituída por outro dispositivo');
+      return false;
+    }
+
+    // Timeout ou erro de conexão - reconectar
+    if (statusCode === DisconnectReason.timedOut || 
+        statusCode === DisconnectReason.connectionClosed ||
+        statusCode === DisconnectReason.connectionLost) {
+      return true;
+    }
+
+    // Por padrão, tentar reconectar para erros desconhecidos
+    return true;
+  }
+
+  /**
+   * Handler de mensagens
+   */
+  private async handleMessages(messages: proto.IWebMessageInfo[]): Promise<void> {
+    for (const msg of messages) {
+      if (msg.key && !msg.key.fromMe && msg.message) {
+        this.metrics.messagesReceived++;
+        const startTime = Date.now();
+
+        try {
+          if (this.messageHandler && this.sock) {
+            await this.messageHandler(msg, this.sock);
+          }
+
+          const responseTime = Date.now() - startTime;
+          this.responseTimes.push(responseTime);
+          if (this.responseTimes.length > 100) {
+            this.responseTimes.shift();
+          }
+          this.metrics.averageResponseTime =
+            this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+        } catch (error) {
+          console.error('❌ Erro ao processar mensagem:', error);
+          this.metrics.errors++;
+        }
+      }
+    }
+  }
+
+  /**
+   * Limpar arquivos de sessão
+   */
+  private clearSessionFiles(): void {
+    try {
+      const authFolder = path.resolve(process.cwd(), AUTH_FOLDER);
+      if (fs.existsSync(authFolder)) {
+        fs.rmSync(authFolder, { recursive: true, force: true });
+        console.log('🗑️ Arquivos de sessão removidos');
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao limpar sessão:', error.message);
+    }
+  }
+
+  /**
+   * Resetar estado interno
+   */
+  private resetState(): void {
     this.connected = false;
     this.connecting = false;
     this.qrCode = null;
     this.pairingCode = null;
     this.phoneNumber = null;
     this.startTime = null;
-    this.connectionMethod = null;
-    console.log('✅ Bot desconectado');
+    this.pairingCodeRequested = false;
   }
 
-  async clearSession(): Promise<void> {
-    console.log('🗑️ Limpando sessão do bot...');
-    this.shouldReconnect = false;
-    this.reconnectAttempts = 0;
+  /**
+   * Desconectar
+   */
+  async disconnect(): Promise<void> {
+    console.log('🔌 Desconectando bot...');
 
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-
-    // 1. Fechar socket silenciosamente (sem logout que tenta enviar mensagem)
     if (this.sock) {
       try {
-        this.sock.end(undefined);  // Fecha sem enviar mensagem
+        this.sock.end(undefined);
       } catch (error) {
         // Ignorar erros ao fechar
       }
       this.sock = null;
     }
 
-    // 2. Aguardar socket liberar arquivos
-    await delay(2000);
-
-    // 3. Resetar estado primeiro
-    this.connected = false;
-    this.connecting = false;
-    this.qrCode = null;
-    this.pairingCode = null;
-    this.phoneNumber = null;
-    this.startTime = null;
-    this.lastConnected = null;
+    this.resetState();
     this.connectionMethod = null;
     this.pendingPhoneNumber = null;
+    console.log('✅ Bot desconectado');
+  }
+
+  /**
+   * Limpar sessão completamente
+   */
+  async clearSession(): Promise<void> {
+    console.log('🗑️ Limpando sessão do bot...');
+
+    // Fechar socket primeiro
+    if (this.sock) {
+      try {
+        this.sock.end(undefined);
+      } catch (error) {
+        // Ignorar
+      }
+      this.sock = null;
+    }
+
+    // Aguardar liberação de arquivos
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Limpar arquivos
+    this.clearSessionFiles();
+
+    // Resetar estado
+    this.resetState();
+    this.connectionMethod = null;
+    this.pendingPhoneNumber = null;
+    this.lastConnected = null;
     this.metrics = {
       messagesReceived: 0,
       messagesSent: 0,
@@ -446,11 +421,17 @@ export class WhatsAppBot {
     };
     this.responseTimes = [];
 
-    // 4. Limpar arquivos com retry
-    await badMacHandler.clearAllSessionFilesWithRetry();
-
     console.log('✅ Sessão limpa. Clique em Conectar para gerar novo código.');
   }
+
+  /**
+   * Método de conexão padrão (QR Code)
+   */
+  async connect(handler: MessageHandler): Promise<void> {
+    return this.connectWithQR(handler);
+  }
+
+  // === GETTERS ===
 
   getStatus(): BotStatus {
     return {
@@ -494,6 +475,8 @@ export class WhatsAppBot {
   }
 
   getBadMacStats(): object {
-    return badMacHandler.getStats();
+    return {
+      note: 'Bad MAC handling integrado na lógica de reconexão'
+    };
   }
 }

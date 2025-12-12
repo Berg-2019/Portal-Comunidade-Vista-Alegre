@@ -1,4 +1,4 @@
-import { proto, WASocket } from '@whiskeysockets/baileys';
+import { proto, WASocket } from 'baileys';
 import { CourtHandler } from './courtHandler';
 import { OccurrenceHandler } from './occurrenceHandler';
 import { PackageHandler } from './packageHandler';

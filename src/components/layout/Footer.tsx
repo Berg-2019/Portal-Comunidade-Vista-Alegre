@@ -48,7 +48,7 @@ export function Footer() {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Carregando...
               </div>
-            ) : (
+            ) : getWhatsAppLink() ? (
               <a
                 href={getWhatsAppLink()}
                 target="_blank"
@@ -58,6 +58,11 @@ export function Footer() {
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp da Comunidade
               </a>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp não configurado
+              </span>
             )}
           </div>
         </div>

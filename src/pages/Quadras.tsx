@@ -146,7 +146,9 @@ export default function Quadras() {
     if (!selectedCourt) return;
     const message = `Quero reservar a ${selectedCourt.name} no dia ${format(selectedDate, "dd/MM", { locale: ptBR })} às ${slot.start_time.slice(0, 5)} em nome de [SEU NOME].`;
     const link = getWhatsAppLink(message);
-    window.open(link, "_blank");
+    if (link) {
+      window.open(link, "_blank");
+    }
   };
 
   const selectedDayOfWeek = selectedDate.getDay();

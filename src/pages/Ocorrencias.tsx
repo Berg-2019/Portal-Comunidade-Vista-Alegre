@@ -103,16 +103,23 @@ export default function Ocorrencias() {
             <p className="text-primary-foreground/85 mb-6">
               Acompanhe os problemas reportados na comunidade e ajude a manter nosso bairro organizado.
             </p>
-            <a
-              href={getWhatsAppLink("Olá! Gostaria de reportar uma ocorrência no bairro Vista Alegre.")}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+            {getWhatsAppLink("Olá! Gostaria de reportar uma ocorrência no bairro Vista Alegre.") ? (
+              <a
+                href={getWhatsAppLink("Olá! Gostaria de reportar uma ocorrência no bairro Vista Alegre.")}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                  <MessageCircle className="h-5 w-5 mr-2" />
+                  Reportar via WhatsApp
+                </Button>
+              </a>
+            ) : (
+              <Button size="lg" disabled className="bg-primary-foreground/50 text-primary">
                 <MessageCircle className="h-5 w-5 mr-2" />
-                Reportar via WhatsApp
+                WhatsApp não configurado
               </Button>
-            </a>
+            )}
           </div>
         </div>
       </section>

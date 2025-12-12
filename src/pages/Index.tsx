@@ -151,16 +151,25 @@ export default function Index() {
                   Ver Notícias
                 </Button>
               </Link>
+              {getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.') ? (
                 <a 
                   href={getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.')}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                <Button size="lg" className="w-full sm:w-auto bg-success text-success-foreground hover:bg-success/90 shadow-lg">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Agendar Quadra
-                </Button>
-              </a>
+                  <Button size="lg" className="w-full sm:w-auto bg-success text-success-foreground hover:bg-success/90 shadow-lg">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Agendar Quadra
+                  </Button>
+                </a>
+              ) : (
+                <Link to="/quadras">
+                  <Button size="lg" className="w-full sm:w-auto bg-success text-success-foreground hover:bg-success/90 shadow-lg">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Agendar Quadra
+                  </Button>
+                </Link>
+              )}
               <Link to="/ocorrencias">
                 <Button size="lg" className="w-full sm:w-auto bg-warning text-warning-foreground hover:bg-warning/90 shadow-lg">
                   <AlertTriangle className="h-5 w-5 mr-2" />

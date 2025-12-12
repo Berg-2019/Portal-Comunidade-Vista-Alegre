@@ -13,6 +13,7 @@ const DisconnectReason = {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
+import qrcodeTerminal from 'qrcode-terminal';
 import fs from 'fs';
 import path from 'path';
 
@@ -99,10 +100,17 @@ export class WhatsAppBot {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-          console.log('📱 QR Code gerado - escaneie para conectar');
+          console.log('📱 QR Code gerado - escaneie no terminal para conectar:');
+          
+          // Exibir QR Code no terminal (modo dev)
+          qrcodeTerminal.generate(qr, { small: true }, (qrString: string) => {
+            console.log('\n' + qrString);
+          });
+          
+          // Também converter para base64 para o frontend
           try {
             this.qrCode = await QRCode.toDataURL(qr);
-            console.log('✅ QR Code convertido para base64');
+            console.log('✅ QR Code também disponível via API');
           } catch (err) {
             console.error('❌ Erro ao gerar QR Code base64:', err);
           }
@@ -213,6 +221,9 @@ export class WhatsAppBot {
 
     if (this.sock) {
       try {
+        // Fechar WebSocket antes do logout
+        this.sock.ws?.close();
+        await new Promise(r => setTimeout(r, 200));
         await this.sock.logout();
       } catch (error) {
         console.log('Erro ao fazer logout (pode ser normal se já desconectado):', error);
@@ -239,8 +250,14 @@ export class WhatsAppBot {
       this.reconnectTimeout = null;
     }
 
+    // Forçar fechamento do socket antes de logout
     if (this.sock) {
       try {
+        // Primeiro termina o socket WebSocket diretamente
+        this.sock.ws?.close();
+        await new Promise(r => setTimeout(r, 300));
+        
+        // Depois tenta logout
         await this.sock.logout();
       } catch (error) {
         console.log('Aviso ao desconectar durante limpeza:', error);
@@ -248,16 +265,26 @@ export class WhatsAppBot {
       this.sock = null;
     }
 
-    // Wait for FS to release files
-    await new Promise(r => setTimeout(r, 500));
+    // Aguardar mais tempo para liberar arquivos
+    await new Promise(r => setTimeout(r, 1500));
 
     const authPath = path.join(process.cwd(), 'auth_info');
-    if (fs.existsSync(authPath)) {
+    
+    // Retry loop para remoção
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (!fs.existsSync(authPath)) break;
+      
       try {
         await fs.promises.rm(authPath, { recursive: true, force: true });
         console.log('✅ Pasta auth_info removida');
+        break;
       } catch (err: any) {
-        console.error('Erro ao remover auth_info:', err);
+        console.log(`Tentativa ${attempt}/3 de remover auth_info falhou:`, err.code);
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        } else {
+          console.error('❌ Não foi possível remover auth_info. Reinicie o container.');
+        }
       }
     }
 

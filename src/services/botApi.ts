@@ -9,6 +9,7 @@ export interface BotStatus {
   phoneNumber: string | null;
   lastConnected: string | null;
   uptime: number;
+  connectionMethod: 'qr' | 'pairing' | null;
 }
 
 export interface BotMetrics {
@@ -71,6 +72,21 @@ class BotApiService {
 
   async clearSession(): Promise<{ success: boolean; message: string }> {
     return this.request('/api/bot/clear-session', { method: 'POST' });
+  }
+
+  async connectWithPairingCode(phoneNumber: string): Promise<{ success: boolean; message: string }> {
+    return this.request('/api/bot/connect-pairing', {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber })
+    });
+  }
+
+  async getPairingCode(): Promise<{ code: string; formatted: string }> {
+    return this.request<{ code: string; formatted: string }>('/api/bot/pairing-code');
+  }
+
+  async getBadMacStats(): Promise<object> {
+    return this.request('/api/bot/bad-mac-stats');
   }
 }
 

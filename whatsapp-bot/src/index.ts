@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { WhatsAppBot } from './bot';
 import { MessageHandler } from './handlers/messageHandler';
+import { badMacHandler } from './utils/badMacHandler';
 
 dotenv.config();
 
@@ -44,18 +45,64 @@ app.get('/api/bot/status', (req, res) => {
   res.json(status);
 });
 
-// Connect bot (generate QR)
+// Connect bot via QR Code (método tradicional)
 app.post('/api/bot/connect', async (req, res) => {
   try {
-    await bot.connect(messageHandler.handleMessage.bind(messageHandler));
-    res.json({ success: true, message: 'Iniciando conexão...' });
+    await bot.connectWithQR(messageHandler.handleMessage.bind(messageHandler));
+    res.json({ success: true, message: 'Iniciando conexão via QR Code...' });
   } catch (error: any) {
-    console.error('Erro ao conectar bot:', error);
+    console.error('Erro ao conectar bot via QR:', error);
     res.status(500).json({
       success: false,
       message: 'Erro ao conectar bot.',
       error: error?.message || 'unknown'
     });
+  }
+});
+
+// Connect bot via Pairing Code (NOVO)
+app.post('/api/bot/connect-pairing', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Número de telefone é obrigatório'
+      });
+    }
+
+    // Validar formato do número
+    const cleanNumber = phoneNumber.replace(/\D/g, '');
+    if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: 'Número de telefone inválido. Use formato: 5511999999999'
+      });
+    }
+
+    await bot.connectWithPairingCode(cleanNumber, messageHandler.handleMessage.bind(messageHandler));
+    res.json({ success: true, message: 'Solicitando código de pareamento...' });
+  } catch (error: any) {
+    console.error('Erro ao conectar bot via Pairing Code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao conectar bot.',
+      error: error?.message || 'unknown'
+    });
+  }
+});
+
+// Get Pairing Code (NOVO)
+app.get('/api/bot/pairing-code', (req, res) => {
+  const code = bot.getPairingCode();
+  if (code) {
+    res.json({
+      code,
+      formatted: `${code.slice(0, 4)}-${code.slice(4)}`
+    });
+  } else {
+    res.status(404).json({ error: 'Código de pareamento não disponível' });
   }
 });
 
@@ -74,13 +121,13 @@ app.post('/api/bot/disconnect', async (req, res) => {
   }
 });
 
-// Clear session (force new QR)
+// Clear session (force new QR/Pairing)
 app.post('/api/bot/clear-session', async (req, res) => {
   try {
     await bot.clearSession();
     res.json({
       success: true,
-      message: 'Sessão limpa. Clique em Conectar para gerar novo QR.'
+      message: 'Sessão limpa. Clique em Conectar para gerar novo código.'
     });
   } catch (error: any) {
     console.error('Erro ao limpar sessão:', error);
@@ -108,6 +155,12 @@ app.get('/api/bot/metrics', (req, res) => {
   res.json(metrics);
 });
 
+// Get Bad MAC stats (NOVO)
+app.get('/api/bot/bad-mac-stats', (req, res) => {
+  const stats = bot.getBadMacStats();
+  res.json(stats);
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'whatsapp-bot' });
@@ -115,4 +168,5 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🤖 WhatsApp Bot API running on port ${PORT}`);
+  console.log(`📋 Versão do WhatsApp Web: ${require('./config').WAWEB_VERSION.join('.')}`);
 });

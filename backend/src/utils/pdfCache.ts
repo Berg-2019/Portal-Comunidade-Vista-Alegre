@@ -79,6 +79,20 @@ export async function saveToCache(
  */
 export async function cleanExpiredCache(): Promise<number> {
   try {
+    // Verificar se tabela existe antes de limpar (evita erro durante startup)
+    const tableCheck = await query(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'pdf_cache'
+      )`
+    );
+
+    if (!tableCheck.rows[0]?.exists) {
+      // Tabela ainda não existe, pular silenciosamente
+      return 0;
+    }
+
     const result = await query(
       `DELETE FROM pdf_cache WHERE expires_at < NOW() RETURNING id`
     );
@@ -89,8 +103,11 @@ export async function cleanExpiredCache(): Promise<number> {
     }
     
     return deletedCount;
-  } catch (error) {
-    console.error('❌ Erro ao limpar cache:', error);
+  } catch (error: any) {
+    // Silenciar erro 42P01 (table does not exist) durante startup
+    if (error.code !== '42P01') {
+      console.error('❌ Erro ao limpar cache:', error);
+    }
     return 0;
   }
 }

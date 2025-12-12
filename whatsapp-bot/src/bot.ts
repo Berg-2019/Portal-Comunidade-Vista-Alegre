@@ -394,21 +394,20 @@ export class WhatsAppBot {
       this.reconnectTimeout = null;
     }
 
+    // 1. Fechar socket silenciosamente (sem logout que tenta enviar mensagem)
     if (this.sock) {
       try {
-        this.sock.ws?.close();
-        await new Promise(r => setTimeout(r, 300));
-        await this.sock.logout();
+        this.sock.end(undefined);  // Fecha sem enviar mensagem
       } catch (error) {
-        console.log('Aviso ao desconectar durante limpeza:', error);
+        // Ignorar erros ao fechar
       }
       this.sock = null;
     }
 
-    await new Promise(r => setTimeout(r, 1500));
+    // 2. Aguardar socket liberar arquivos
+    await delay(2000);
 
-    badMacHandler.clearAllSessionFiles();
-
+    // 3. Resetar estado primeiro
     this.connected = false;
     this.connecting = false;
     this.qrCode = null;
@@ -428,6 +427,9 @@ export class WhatsAppBot {
       errors: 0
     };
     this.responseTimes = [];
+
+    // 4. Limpar arquivos com retry
+    await badMacHandler.clearAllSessionFilesWithRetry();
 
     console.log('✅ Sessão limpa. Clique em Conectar para gerar novo código.');
   }

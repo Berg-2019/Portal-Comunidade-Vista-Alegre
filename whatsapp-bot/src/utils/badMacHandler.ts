@@ -129,6 +129,49 @@ class BadMacHandler {
   }
 
   /**
+   * Limpar sessão com retry e delay (para evitar EBUSY)
+   */
+  async clearAllSessionFilesWithRetry(maxRetries: number = 3): Promise<boolean> {
+    const authFolder = path.resolve(process.cwd(), AUTH_FOLDER);
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (!fs.existsSync(authFolder)) {
+          console.log('📁 Pasta auth_info não existe, nada a limpar');
+          return true;
+        }
+
+        // Deletar arquivos individualmente primeiro
+        const files = fs.readdirSync(authFolder);
+        for (const file of files) {
+          const filePath = path.join(authFolder, file);
+          try {
+            if (fs.statSync(filePath).isFile()) {
+              fs.unlinkSync(filePath);
+            }
+          } catch (err) {
+            // Ignorar erros em arquivos individuais
+          }
+        }
+
+        // Tentar remover pasta vazia
+        fs.rmdirSync(authFolder);
+        console.log('🗑️ Toda a sessão foi removida com sucesso');
+        return true;
+      } catch (error: any) {
+        if (attempt < maxRetries - 1) {
+          console.log(`⏳ Aguardando liberação de arquivos... (tentativa ${attempt + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, 1000));
+        } else {
+          console.error(`❌ Não foi possível limpar sessão após ${maxRetries} tentativas: ${error.message}`);
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Incrementar contador de erros
    */
   incrementErrorCount(): void {

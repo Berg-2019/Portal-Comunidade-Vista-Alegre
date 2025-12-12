@@ -5,7 +5,8 @@ import makeWASocket, {
   useMultiFileAuthState,
   isJidBroadcast,
   isJidStatusBroadcast,
-  isJidNewsletter
+  isJidNewsletter,
+  delay
 } from 'baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -134,6 +135,8 @@ export class WhatsAppBot {
       // Solicitar pairing code se não registrado
       if (!this.sock.authState.creds.registered) {
         const cleanNumber = phoneNumber.replace(/\D/g, '');
+        console.log(`📱 Aguardando socket ficar pronto...`);
+        await delay(5000); // Aguardar WebSocket estabelecer conexão
         console.log(`📱 Solicitando código de pareamento para: ${cleanNumber}`);
         
         try {

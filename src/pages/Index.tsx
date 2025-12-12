@@ -95,7 +95,7 @@ export default function Index() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [occurrences, setOccurrences] = useState<OccurrenceItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const { settings } = useSettings();
+  const { settings, getWhatsAppLink } = useSettings();
 
   useEffect(() => {
     async function fetchData() {
@@ -151,11 +151,11 @@ export default function Index() {
                   Ver Notícias
                 </Button>
               </Link>
-              <a 
-                href={`https://wa.me/${settings?.whatsapp_number || '5569999999999'}?text=${encodeURIComponent('Olá! Gostaria de agendar uma quadra esportiva.')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+                <a 
+                  href={getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                 <Button size="lg" className="w-full sm:w-auto bg-success text-success-foreground hover:bg-success/90 shadow-lg">
                   <Calendar className="h-5 w-5 mr-2" />
                   Agendar Quadra

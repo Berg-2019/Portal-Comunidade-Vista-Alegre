@@ -236,7 +236,7 @@ export default function AdminDashboard() {
     
     setSaving(true);
     try {
-      await api.updatePackage(String(editingPackage.id), {
+      const response = await api.updatePackage(String(editingPackage.id), {
         recipient_name: editingPackage.recipient_name,
         tracking_code: editingPackage.tracking_code,
         arrival_date: editingPackage.arrival_date,
@@ -245,8 +245,10 @@ export default function AdminDashboard() {
         notes: editingPackage.notes,
       });
       
+      // Usa a resposta do servidor para garantir dados consistentes
+      const updatedPackage = response.package as PackageItem;
       setPackages((prev) =>
-        prev.map((pkg) => (pkg.id === editingPackage.id ? editingPackage : pkg))
+        prev.map((pkg) => (pkg.id === editingPackage.id ? updatedPackage : pkg))
       );
       
       setEditModalOpen(false);

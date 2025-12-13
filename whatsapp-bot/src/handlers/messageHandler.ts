@@ -109,13 +109,22 @@ export class MessageHandler {
   }
 
   private async startCourtFlow(jid: string, sock: WASocket): Promise<void> {
+    const courts = await this.courtHandler.getCourts();
+    
+    // Só iniciar fluxo se há quadras disponíveis
+    if (courts.length === 0) {
+      await sock.sendMessage(jid, { 
+        text: MessageTemplates.courtSelection(courts) 
+      });
+      return;
+    }
+
     this.sessionManager.updateSession(jid, {
       currentFlow: 'court',
       step: 'select_court',
       data: {}
     });
 
-    const courts = await this.courtHandler.getCourts();
     await sock.sendMessage(jid, { 
       text: MessageTemplates.courtSelection(courts) 
     });
@@ -157,6 +166,13 @@ export class MessageHandler {
       await sock.sendMessage(jid, { 
         text: MessageTemplates.flowCancelled() 
       });
+      await this.sendMenu(jid, sock);
+      return;
+    }
+
+    // Permitir "menu" em qualquer momento dentro de um fluxo
+    if (this.isMenuCommand(text)) {
+      this.sessionManager.clearSession(jid);
       await this.sendMenu(jid, sock);
       return;
     }

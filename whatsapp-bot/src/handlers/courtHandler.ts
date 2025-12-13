@@ -7,8 +7,8 @@ interface Court {
   id: number;
   name: string;
   description: string;
-  is_active: boolean;
-  is_maintenance: boolean;
+  available: boolean;
+  maintenance_mode: boolean;
 }
 
 interface TimeSlot {
@@ -27,7 +27,7 @@ export class CourtHandler {
   async getCourts(): Promise<Court[]> {
     try {
       const response = await this.apiClient.get('/api/courts');
-      this.courts = response.data.filter((c: Court) => c.is_active && !c.is_maintenance);
+      this.courts = response.data.filter((c: Court) => c.available !== false && !c.maintenance_mode);
       return this.courts;
     } catch (error) {
       console.error('Erro ao buscar quadras:', error);
@@ -112,7 +112,7 @@ export class CourtHandler {
 
     try {
       const response = await this.apiClient.get(
-        `/api/courts/${session.data.courtId}/slots?dayOfWeek=${dayOfWeek}`
+        `/api/courts/${session.data.courtId}/slots?day_of_week=${dayOfWeek}`
       );
       
       const slots: TimeSlot[] = response.data.slots.filter((s: TimeSlot) => s.is_available);

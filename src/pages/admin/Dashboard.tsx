@@ -92,6 +92,21 @@ const statusConfig = {
   devolvido: { label: "Devolvido", icon: XCircle, class: "bg-destructive/10 text-destructive" },
 };
 
+// Mapeamento de tabs para permissões necessárias
+const tabPermissions: Record<ActiveTab, string | null> = {
+  encomendas: "packages",
+  noticias: "news",
+  ocorrencias: "occurrences",
+  comercios: "businesses",
+  quadras: "courts",
+  agendamentos: "courts",
+  whatsapp: "settings",
+  bot: "settings",
+  pagina: "settings",
+  cores: "settings",
+  usuarios: "users",
+};
+
 const navItems = [
   { id: "encomendas" as ActiveTab, label: "Encomendas", icon: Package },
   { id: "noticias" as ActiveTab, label: "Notícias", icon: Newspaper },
@@ -107,7 +122,30 @@ const navItems = [
 ];
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("encomendas");
+  const { toast } = useToast();
+  const { user, logout, hasPermission } = useAuth();
+  const navigate = useNavigate();
+
+  // Verifica se o usuário tem permissão para uma tab
+  const canAccessTab = (tabId: ActiveTab): boolean => {
+    if (user?.role === 'developer') return true;
+    const permission = tabPermissions[tabId];
+    if (!permission) return true;
+    return hasPermission(permission);
+  };
+
+  // Filtra as tabs visíveis baseado nas permissões
+  const visibleNavItems = navItems.filter(item => canAccessTab(item.id));
+
+  // Define a tab inicial baseada na primeira tab disponível
+  const getInitialTab = (): ActiveTab => {
+    if (visibleNavItems.length > 0) {
+      return visibleNavItems[0].id;
+    }
+    return "encomendas";
+  };
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -118,9 +156,6 @@ export default function AdminDashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPackageId, setDeletingPackageId] = useState<string | number | null>(null);
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (activeTab === "encomendas") {
@@ -325,7 +360,7 @@ export default function AdminDashboard() {
           </div>
 
           <nav className="space-y-1">
-            {navItems.map((item, index) => (
+            {visibleNavItems.map((item, index) => (
               <div key={item.id}>
                 {item.divider && (
                   <div className="my-4 border-t border-border" />

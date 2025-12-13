@@ -314,6 +314,7 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
         const recipientName = pkg.recipient_name || pkg.recipient;
         const trackingCode = pkg.tracking_code || pkg.trackingCode;
         const arrivalDateStr = pkg.arrival_date || pkg.dateISO;
+        const pickupDeadlineStr = pkg.pickup_deadline;
         
         // Validate required fields
         if (!recipientName || !trackingCode) {
@@ -349,10 +350,17 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
           continue;
         }
 
-        // Calculate pickup deadline (7 days from arrival)
-        const arrivalDate = new Date(arrivalDateStr || new Date());
-        const pickupDeadline = new Date(arrivalDate);
-        pickupDeadline.setDate(pickupDeadline.getDate() + 7);
+        // Use arrival date from frontend or default to today
+        const arrivalDate = arrivalDateStr ? new Date(arrivalDateStr + 'T12:00:00') : new Date();
+        
+        // Use pickup deadline from frontend or calculate 7 days from arrival
+        let pickupDeadline: Date;
+        if (pickupDeadlineStr) {
+          pickupDeadline = new Date(pickupDeadlineStr + 'T12:00:00');
+        } else {
+          pickupDeadline = new Date(arrivalDate);
+          pickupDeadline.setDate(pickupDeadline.getDate() + 7);
+        }
 
         await query(
           `INSERT INTO packages (recipient_name, tracking_code, status, arrival_date, pickup_deadline, pdf_source)
@@ -361,7 +369,7 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
             cleanRecipientName(recipientName), 
             trackingCode.toUpperCase(), 
             arrivalDate.toISOString().split('T')[0], 
-            pickupDeadline, 
+            pickupDeadline.toISOString().split('T')[0], 
             filename || null
           ]
         );

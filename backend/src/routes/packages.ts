@@ -433,18 +433,37 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
     const { id } = req.params;
     const { status, notes, recipient_name, tracking_code, arrival_date, pickup_deadline } = req.body;
 
+    // Parse dates properly - handle both ISO strings and date-only strings
+    const parseDate = (dateStr: string | undefined): string | null => {
+      if (!dateStr) return null;
+      // If it's just a date string (YYYY-MM-DD), use it directly
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr;
+      }
+      // If it's an ISO string, extract the date part
+      if (dateStr.includes('T')) {
+        return dateStr.split('T')[0];
+      }
+      return dateStr;
+    };
+
+    const parsedArrivalDate = parseDate(arrival_date);
+    const parsedPickupDeadline = parseDate(pickup_deadline);
+
+    console.log('📦 Atualizando encomenda:', { id, arrival_date, pickup_deadline, parsedArrivalDate, parsedPickupDeadline });
+
     const result = await query(
       `UPDATE packages 
        SET status = COALESCE($1, status),
            notes = COALESCE($2, notes),
            recipient_name = COALESCE($3, recipient_name),
            tracking_code = COALESCE($4, tracking_code),
-           arrival_date = COALESCE($5, arrival_date),
-           pickup_deadline = COALESCE($6, pickup_deadline),
+           arrival_date = COALESCE($5::date, arrival_date),
+           pickup_deadline = COALESCE($6::date, pickup_deadline),
            updated_at = NOW()
        WHERE id = $7
        RETURNING *`,
-      [status, notes, recipient_name, tracking_code, arrival_date, pickup_deadline, id]
+      [status, notes, recipient_name, tracking_code, parsedArrivalDate, parsedPickupDeadline, id]
     );
 
     if (result.rows.length === 0) {

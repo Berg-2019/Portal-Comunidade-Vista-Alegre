@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, X, Check, Loader2, AlertCircle, Trash2, Edit2 } from 'lucide-react';
+import { Upload, FileText, Check, Loader2, AlertCircle, Trash2, Edit2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -20,11 +21,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/services/api';
+import { format } from 'date-fns';
 
 interface ExtractedPackage {
   recipient_name: string;
   tracking_code: string;
   arrival_date: string;
+  pickup_deadline: string;
   selected: boolean;
 }
 
@@ -41,6 +44,11 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
   const [extractedPackages, setExtractedPackages] = useState<ExtractedPackage[]>([]);
   const [pdfFilename, setPdfFilename] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  
+  // Datas do lote inteiro
+  const [batchArrivalDate, setBatchArrivalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [batchPickupDeadline, setBatchPickupDeadline] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -72,8 +80,12 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
       const result = await api.uploadPackagePdf(formData);
 
       if (result.success && result.results) {
+        // Aplica as datas do lote a todas as encomendas
         const packagesWithSelection = result.results.packages.map((pkg: any) => ({
-          ...pkg,
+          recipient_name: pkg.recipient_name || '',
+          tracking_code: pkg.tracking_code || '',
+          arrival_date: batchArrivalDate,
+          pickup_deadline: batchPickupDeadline,
           selected: true,
         }));
         setExtractedPackages(packagesWithSelection);
@@ -88,7 +100,7 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
         } else {
           toast({
             title: 'PDF processado',
-            description: `${packagesWithSelection.length} encomendas extraídas. Revise e confirme a importação.`,
+            description: `${packagesWithSelection.length} encomendas extraídas. Defina as datas e confirme a importação.`,
           });
         }
       }
@@ -161,11 +173,28 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
     );
   };
 
+  // Aplica as datas do lote a todas as encomendas selecionadas
+  const applyBatchDates = () => {
+    setExtractedPackages(prev =>
+      prev.map(pkg => ({
+        ...pkg,
+        arrival_date: batchArrivalDate,
+        pickup_deadline: batchPickupDeadline,
+      }))
+    );
+    toast({
+      title: 'Datas aplicadas',
+      description: 'As datas foram aplicadas a todas as encomendas.',
+    });
+  };
+
   const handleClose = () => {
     setFile(null);
     setExtractedPackages([]);
     setPdfFilename('');
     setEditingIndex(null);
+    setBatchArrivalDate(format(new Date(), 'yyyy-MM-dd'));
+    setBatchPickupDeadline('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -228,6 +257,46 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
           {/* Extracted Packages Preview */}
           {extractedPackages.length > 0 && (
             <div className="space-y-4">
+              {/* Batch Date Settings */}
+              <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Datas do Lote</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-arrival">Data de Entrada</Label>
+                    <Input
+                      id="batch-arrival"
+                      type="date"
+                      value={batchArrivalDate}
+                      onChange={(e) => setBatchArrivalDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-deadline">Prazo para Retirada</Label>
+                    <Input
+                      id="batch-deadline"
+                      type="date"
+                      value={batchPickupDeadline}
+                      onChange={(e) => setBatchPickupDeadline(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="secondary" 
+                      onClick={applyBatchDates}
+                      className="w-full"
+                    >
+                      Aplicar a Todas
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Defina as datas acima e clique em "Aplicar a Todas" para atualizar todas as encomendas.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Check className="h-5 w-5 text-success" />
@@ -270,7 +339,8 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
                       </TableHead>
                       <TableHead>Destinatário</TableHead>
                       <TableHead>Código de Rastreio</TableHead>
-                      <TableHead>Data de Chegada</TableHead>
+                      <TableHead>Data de Entrada</TableHead>
+                      <TableHead>Prazo</TableHead>
                       <TableHead className="w-24">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -316,7 +386,19 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
                               className="h-8"
                             />
                           ) : (
-                            pkg.arrival_date ? new Date(pkg.arrival_date).toLocaleDateString('pt-BR') : '-'
+                            pkg.arrival_date ? format(new Date(pkg.arrival_date + 'T12:00:00'), 'dd/MM/yyyy') : '-'
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingIndex === index ? (
+                            <Input
+                              type="date"
+                              value={pkg.pickup_deadline}
+                              onChange={(e) => updatePackage(index, 'pickup_deadline', e.target.value)}
+                              className="h-8"
+                            />
+                          ) : (
+                            pkg.pickup_deadline ? format(new Date(pkg.pickup_deadline + 'T12:00:00'), 'dd/MM/yyyy') : '-'
                           )}
                         </TableCell>
                         <TableCell>

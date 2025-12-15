@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Layout } from "@/components/layout/Layout";
 import { cn } from "@/lib/utils";
 import { api } from "@/services/api";
-import { format, parseISO, differenceInDays } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatDateBR, daysDifference } from "@/lib/dateUtils";
 
 type PackageStatus = "aguardando" | "entregue" | "devolvido";
 
@@ -72,9 +71,8 @@ export default function Encomendas() {
   });
 
   const getDaysRemaining = (deadline: string): number => {
-    const deadlineDate = parseISO(deadline);
     const today = new Date();
-    return differenceInDays(deadlineDate, today);
+    return daysDifference(today, deadline);
   };
 
   const stats = {
@@ -206,13 +204,13 @@ export default function Encomendas() {
                       <div>
                         <p className="text-muted-foreground">Chegada</p>
                         <p className="font-medium">
-                          {format(parseISO(pkg.arrival_date), "dd/MM/yyyy", { locale: ptBR })}
+                          {formatDateBR(pkg.arrival_date)}
                         </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Prazo</p>
                         <p className="font-medium">
-                          {format(parseISO(pkg.pickup_deadline), "dd/MM/yyyy", { locale: ptBR })}
+                          {formatDateBR(pkg.pickup_deadline)}
                         </p>
                       </div>
                       {pkg.status === "aguardando" && (

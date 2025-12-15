@@ -21,7 +21,32 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/services/api';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
+
+// Helper function to safely format dates
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  
+  try {
+    // Try parsing as ISO date first
+    let date = parseISO(dateString);
+    
+    // If not valid, try adding time component
+    if (!isValid(date)) {
+      date = new Date(dateString + 'T12:00:00');
+    }
+    
+    // Check if date is valid
+    if (!isValid(date)) {
+      return '-';
+    }
+    
+    return format(date, 'dd/MM/yyyy');
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    return '-';
+  }
+};
 
 interface ExtractedPackage {
   recipient_name: string;
@@ -386,7 +411,7 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
                               className="h-8"
                             />
                           ) : (
-                            pkg.arrival_date ? format(new Date(pkg.arrival_date + 'T12:00:00'), 'dd/MM/yyyy') : '-'
+                            formatDate(pkg.arrival_date)
                           )}
                         </TableCell>
                         <TableCell>
@@ -398,7 +423,7 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
                               className="h-8"
                             />
                           ) : (
-                            pkg.pickup_deadline ? format(new Date(pkg.pickup_deadline + 'T12:00:00'), 'dd/MM/yyyy') : '-'
+                            formatDate(pkg.pickup_deadline)
                           )}
                         </TableCell>
                         <TableCell>

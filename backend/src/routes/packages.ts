@@ -79,7 +79,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { search, status } = req.query;
     
-    let queryText = 'SELECT * FROM packages WHERE 1=1';
+    let queryText = `SELECT 
+      id, 
+      recipient_name, 
+      tracking_code, 
+      status, 
+      TO_CHAR(arrival_date, 'YYYY-MM-DD') as arrival_date,
+      TO_CHAR(pickup_deadline, 'YYYY-MM-DD') as pickup_deadline,
+      notes,
+      pdf_source,
+      created_at,
+      updated_at
+    FROM packages WHERE 1=1`;
     const params: any[] = [];
     let paramIndex = 1;
 
@@ -102,7 +113,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     // Calculate remaining days for each package
     const packages = result.rows.map(pkg => {
       const today = new Date();
-      const deadline = new Date(pkg.pickup_deadline);
+      const deadline = new Date(pkg.pickup_deadline + 'T12:00:00');
       const diffTime = deadline.getTime() - today.getTime();
       const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
@@ -123,7 +134,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 router.get('/admin/all', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(`
-      SELECT * FROM packages 
+      SELECT 
+        id, 
+        recipient_name, 
+        tracking_code, 
+        status, 
+        TO_CHAR(arrival_date, 'YYYY-MM-DD') as arrival_date,
+        TO_CHAR(pickup_deadline, 'YYYY-MM-DD') as pickup_deadline,
+        notes,
+        pdf_source,
+        created_at,
+        updated_at
+      FROM packages 
       ORDER BY 
         CASE status 
           WHEN 'aguardando' THEN 1 
@@ -471,7 +493,17 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
            pickup_deadline = COALESCE($6::date, pickup_deadline),
            updated_at = NOW()
        WHERE id = $7
-       RETURNING *`,
+       RETURNING 
+         id, 
+         recipient_name, 
+         tracking_code, 
+         status, 
+         TO_CHAR(arrival_date, 'YYYY-MM-DD') as arrival_date,
+         TO_CHAR(pickup_deadline, 'YYYY-MM-DD') as pickup_deadline,
+         notes,
+         pdf_source,
+         created_at,
+         updated_at`,
       [status, notes, recipient_name, tracking_code, parsedArrivalDate, parsedPickupDeadline, id]
     );
 
@@ -479,6 +511,8 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
       res.status(404).json({ error: 'Package not found' });
       return;
     }
+
+    console.log('✅ Encomenda atualizada:', result.rows[0]);
 
     res.json({ success: true, package: result.rows[0] });
   } catch (error) {

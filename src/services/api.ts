@@ -203,7 +203,7 @@ class ApiService {
     });
   }
 
-  async confirmPackageImport(packages: { recipient_name: string; tracking_code: string; arrival_date: string }[], pdfFilename: string) {
+  async confirmPackageImport(packages: { recipient_name: string; tracking_code: string; arrival_date: string; pickup_deadline?: string }[], pdfFilename: string) {
     return this.request<{ success: boolean; imported: number; duplicates: number }>('/api/packages/confirm-import', {
       method: 'POST',
       body: JSON.stringify({ packages, pdf_filename: pdfFilename }),

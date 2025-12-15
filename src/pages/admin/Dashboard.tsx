@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import {
   Package,
   Upload,
@@ -547,10 +548,10 @@ export default function AdminDashboard() {
                                 <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.tracking_code}</code>
                               </td>
                               <td className="px-6 py-4 text-sm text-muted-foreground">
-                                {new Date(pkg.arrival_date).toLocaleDateString('pt-BR')}
+                                {format(new Date(pkg.arrival_date + 'T12:00:00'), 'dd/MM/yyyy')}
                               </td>
                               <td className="px-6 py-4 text-sm text-muted-foreground">
-                                {new Date(pkg.pickup_deadline).toLocaleDateString('pt-BR')}
+                                {format(new Date(pkg.pickup_deadline + 'T12:00:00'), 'dd/MM/yyyy')}
                               </td>
                               <td className="px-6 py-4">
                                 <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>

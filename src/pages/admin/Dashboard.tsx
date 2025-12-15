@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { format } from "date-fns";
 import {
   Package,
   Upload,
@@ -73,6 +72,7 @@ import { AdminPackagePDFUpload } from "@/components/admin/AdminPackagePDFUpload"
 import { AdminColorEditor } from "@/components/admin/AdminColorEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/services/api";
+import { formatDateBR, formatDateISO } from "@/lib/dateUtils";
 
 type PackageStatus = "aguardando" | "entregue" | "devolvido";
 type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios" | "cores";
@@ -121,6 +121,7 @@ const navItems = [
   { id: "cores" as ActiveTab, label: "Cores do Site", icon: Palette },
   { id: "usuarios" as ActiveTab, label: "Usuários", icon: Shield },
 ];
+
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -548,10 +549,10 @@ export default function AdminDashboard() {
                                 <code className="text-sm bg-muted px-2 py-1 rounded">{pkg.tracking_code}</code>
                               </td>
                               <td className="px-6 py-4 text-sm text-muted-foreground">
-                                {format(new Date(pkg.arrival_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                                {formatDateBR(pkg.arrival_date)}
                               </td>
                               <td className="px-6 py-4 text-sm text-muted-foreground">
-                                {format(new Date(pkg.pickup_deadline + 'T12:00:00'), 'dd/MM/yyyy')}
+                                {formatDateBR(pkg.pickup_deadline)}
                               </td>
                               <td className="px-6 py-4">
                                 <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium", config.class)}>
@@ -715,7 +716,7 @@ export default function AdminDashboard() {
                     <Input
                       id="arrival_date"
                       type="date"
-                      value={editingPackage.arrival_date?.split('T')[0] || ''}
+                      value={formatDateISO(editingPackage.arrival_date)}
                       onChange={(e) => setEditingPackage({ ...editingPackage, arrival_date: e.target.value })}
                     />
                   </div>
@@ -724,7 +725,7 @@ export default function AdminDashboard() {
                     <Input
                       id="pickup_deadline"
                       type="date"
-                      value={editingPackage.pickup_deadline?.split('T')[0] || ''}
+                      value={formatDateISO(editingPackage.pickup_deadline)}
                       onChange={(e) => setEditingPackage({ ...editingPackage, pickup_deadline: e.target.value })}
                     />
                   </div>

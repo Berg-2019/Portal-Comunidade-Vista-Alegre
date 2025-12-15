@@ -316,6 +316,15 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
         const arrivalDateStr = pkg.arrival_date || pkg.dateISO;
         const pickupDeadlineStr = pkg.pickup_deadline;
         
+        // Debug: log received dates
+        console.log('📦 Package import - Datas recebidas:', {
+          trackingCode,
+          recipientName,
+          arrivalDateStr,
+          pickupDeadlineStr,
+          rawPkg: pkg
+        });
+        
         // Validate required fields
         if (!recipientName || !trackingCode) {
           results.errors++;

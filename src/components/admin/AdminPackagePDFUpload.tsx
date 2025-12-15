@@ -135,7 +135,7 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
       
       toast({
         title: 'Importação concluída',
-        description: `${response.imported} encomendas importadas. ${response.duplicates} duplicadas ignoradas.`,
+        description: `${response.results.imported} encomendas importadas. ${response.results.duplicates} duplicadas ignoradas.`,
       });
 
       handleClose();

@@ -36,13 +36,7 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // 5 tentativas de login por 15 minutos
-  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// authLimiter movido para routes/auth.ts (aplicado apenas no login)
 
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
@@ -64,7 +58,7 @@ app.use(generalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes with specific rate limiters
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes); // Rate limiter específico aplicado apenas no login
 app.use('/api/upload', uploadLimiter, uploadRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/settings', settingsRoutes);

@@ -1,13 +1,23 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { query } from '../config/database';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Login
-router.post('/login', async (req, res) => {
+// Rate limiter específico para login (proteção contra brute force)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // 5 tentativas de login por 15 minutos
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Login (com rate limit restritivo)
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 

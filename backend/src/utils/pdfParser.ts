@@ -112,16 +112,34 @@ export function cleanRecipientName(name: string): string {
   if (!name || typeof name !== 'string') return 'NOME NÃO IDENTIFICADO';
   
   let cleaned = name
-    // Remove address after ":"
-    .replace(/:.*$/, '')
-    // Remove RUA, AV, TRAVESSA, etc. (addresses)
-    .replace(/\s*(RUA|AV|AVENIDA|TRAVESSA|TV|ESTRADA|ROD|RODOVIA|BR|KM|Nº|N°|NUMERO|BAIRRO|SETOR|QUADRA|LOTE|CASA|APT|APARTAMENTO|BLOCO|CONDOMINIO|COND|CEP|CIDADE|ESTADO|UF)\s*.*/i, '')
+    // Remove address after ":" or "&"
+    .replace(/[:&].*$/, '')
+    // Remove underscores (common in PDF forms)
+    .replace(/_+/g, ' ')
+    // Remove RUA, AV, TRAVESSA, etc. (addresses) - CRITICAL: Use word boundaries \b
+    .replace(/\s*\b(RUA|AV|AVENIDA|TRAVESSA|TV|ESTRADA|ROD|RODOVIA|BR|KM|Nº|N°|NUMERO|BAIRRO|SETOR|QUADRA|LOTE|CASA|APT|APARTAMENTO|BLOCO|CONDOMINIO|COND|CEP|CIDADE|ESTADO|UF|RECEBEDOR|ASSINATURA)\b\s*.*/i, '')
     // Remove special characters except letters, spaces, dots, hyphens, apostrophes
-    // FIX: Removed extra backslash in regex (was \\p{L}, now \p{L})
     .replace(/[^\p{L}\s.\-']/gu, '')
     // Remove multiple spaces
     .replace(/\s+/g, ' ')
     .trim();
+  
+  // VALIDATION: Filter out table headers and common non-name patterns
+  const lowerCleaned = cleaned.toLowerCase();
+  const headerPatterns = [
+    'grupodataposicaoobjetodestinatariodata',
+    'grupo data posicao objeto destinatario',
+    'data receb',
+    'documento',
+    'assinatura',
+    'recebedor'
+  ];
+  
+  for (const pattern of headerPatterns) {
+    if (lowerCleaned.includes(pattern) || lowerCleaned.replace(/\s/g, '').includes(pattern.replace(/\s/g, ''))) {
+      return 'NOME NÃO IDENTIFICADO';
+    }
+  }
   
   // VALIDATION: Minimum 3 characters
   if (cleaned.length < 3) return 'NOME NÃO IDENTIFICADO';
@@ -129,6 +147,15 @@ export function cleanRecipientName(name: string): string {
   // VALIDATION: Minimum 2 words (for full names) - but allow single long word (compound name)
   const words = cleaned.split(' ').filter(w => w.length > 0);
   if (words.length < 2 && cleaned.length < 8) return 'NOME NÃO IDENTIFICADO';
+  
+  // VALIDATION: Check if it's not just numbers or single letters
+  if (words.every(w => w.length === 1)) return 'NOME NÃO IDENTIFICADO';
+  
+  // VALIDATION: Filter out single-word non-names (CASA, LOJA, etc.)
+  const singleWordInvalid = ['casa', 'loja', 'empresa', 'comercio', 'estabelecimento'];
+  if (words.length === 1 && singleWordInvalid.includes(lowerCleaned)) {
+    return 'NOME NÃO IDENTIFICADO';
+  }
   
   // Convert to Title Case
   cleaned = words
@@ -359,6 +386,75 @@ async function extractWithPdfJsDist(buffer: Buffer, logger: PDFLogger): Promise<
 // ============= Text Parsing =============
 
 /**
+ * Normalize lines by joining broken recipient names
+ * This fixes the issue where PDF line breaks split recipient names into multiple lines
+ */
+function normalizeLinesForNames(originalText: string, logger: PDFLogger): string[] {
+  const rawLines = originalText.split('\n').filter(l => l.trim().length > 0);
+  const normalized: string[] = [];
+  let joinedCount = 0;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    let line = rawLines[i];
+
+    // Strategy 1: If current line has NO tracking code but next line HAS one,
+    // this line is likely a continuation of the name from the next line
+    if (!TRACKING_CODE_GLOBAL.test(line) && i + 1 < rawLines.length && TRACKING_CODE_GLOBAL.test(rawLines[i + 1])) {
+      // Join this line with the next line (prepend name continuation)
+      rawLines[i + 1] = line.trim() + ' ' + rawLines[i + 1].trim();
+      joinedCount++;
+      logger.info('Normalize', `Linha ${i + 1} juntada com próxima (nome antes do código)`);
+      continue; // Skip adding this line separately
+    }
+
+    // Strategy 2: If current line HAS tracking code and next line does NOT,
+    // and next line looks like a name continuation (starts with uppercase, has letters)
+    if (TRACKING_CODE_GLOBAL.test(line) && i + 1 < rawLines.length && !TRACKING_CODE_GLOBAL.test(rawLines[i + 1])) {
+      const next = rawLines[i + 1].trim();
+      
+      // Heuristic: Next line starts with uppercase letter and has at least 3 characters
+      // and doesn't look like an address (no RUA, AV, etc.)
+      if (/^[A-ZÀ-Ú][A-Za-zÀ-ú\s]{2,}$/.test(next) && 
+          !/\b(RUA|AV|AVENIDA|TRAVESSA|TV|ESTRADA|ROD|RODOVIA|BR|KM|Nº|N°|NUMERO|BAIRRO|SETOR|QUADRA|LOTE|CASA|APT|APARTAMENTO|BLOCO|CEP)\b/i.test(next)) {
+        
+        // Join next line to current line (append name continuation)
+        line = line.trim() + ' ' + next;
+        i++; // Skip next line, already consumed
+        joinedCount++;
+        logger.info('Normalize', `Linha ${i} juntada com seguinte (continuação de nome)`);
+      }
+    }
+
+    // Strategy 3: If current line has NO tracking code, NO date, NO position,
+    // but has name-like content, and previous line had tracking code,
+    // this is likely a name continuation that should be appended to previous
+    if (normalized.length > 0 && 
+        !TRACKING_CODE_GLOBAL.test(line) && 
+        !DATE_GLOBAL.test(line) && 
+        !POSITION_REGEX.test(line) &&
+        /^[A-ZÀ-Ú][A-Za-zÀ-ú\s]{2,}$/.test(line.trim()) &&
+        TRACKING_CODE_GLOBAL.test(normalized[normalized.length - 1])) {
+      
+      // Append to previous line
+      normalized[normalized.length - 1] = normalized[normalized.length - 1].trim() + ' ' + line.trim();
+      joinedCount++;
+      logger.info('Normalize', `Linha ${i + 1} juntada com anterior (continuação detectada)`);
+      continue;
+    }
+
+    normalized.push(line);
+  }
+
+  logger.info('Normalize', `Total de linhas juntadas: ${joinedCount}`, {
+    original: rawLines.length,
+    normalized: normalized.length
+  });
+
+  return normalized;
+}
+
+
+/**
  * Extract packages from raw text content
  */
 function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
@@ -422,11 +518,13 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
   
   // Pattern 1.5: LDI format without pipes (common in extracted text)
   // Format: "1 08/12/2025 PCM - 120 AN246666127BR Vanusa Novais Rodrigues :RUA..."
+  // Also handles: "104/12/2025PCM - 2AN196638130BR LIGIANNE DOS SANTOS AGUIRRE:&"
   if (packages.length === 0) {
     logger.info('Parse', 'Tentando padrão LDI (sem pipes)');
     
-    // Regex: número data posição código nome (até : ou fim ou próximo número)
-    const ldiPattern = /(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+([A-Z]{2,4}\s*-\s*\d+)\s+([A-Z]{2}\d{9}[A-Z]{2})\s+([A-ZÀ-Ú][A-Za-zÀ-ú\s]+?)(?=\s*:|$|\s+\d+\s+\d{2}\/)/g;
+    // Regex: número + data + posição + código + nome (mais flexível)
+    // Permite espaços opcionais entre elementos
+    const ldiPattern = /(\d+)\s*(\d{2}\/\d{2}\/\d{4})\s*([A-Z]{2,4}\s*-\s*\d+)\s*([A-Z]{2}\d{9}[A-Z]{2})\s*([A-ZÀ-Ú][A-ZÀ-Úa-zÀ-ú\s]+?)(?=\s*:|&|___|\s+\d+\s*\d{2}\/|$)/gi;
     
     let ldiMatch;
     while ((ldiMatch = ldiPattern.exec(text)) !== null) {
@@ -438,14 +536,21 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
       const parsedDate = parseDate(dateStr);
       seenCodes.add(trackingCode);
       
+      const recipient = cleanRecipientName(recipientRaw);
+      
+      // Skip if it's a header or invalid name
+      if (recipient === 'NOME NÃO IDENTIFICADO') {
+        logger.warn('Parse', `LDI: Nome não identificado para ${trackingCode}`);
+      }
+      
       packages.push({
         lineNumber: parseInt(lineNum) || lineNumber,
         trackingCode: trackingCode.toUpperCase(),
-        recipient: cleanRecipientName(recipientRaw),
+        recipient,
         position: cleanPosition(position),
         date: parsedDate?.date || dateStr,
         dateISO: parsedDate?.dateISO || new Date().toISOString().split('T')[0],
-        confidence: 90
+        confidence: recipient === 'NOME NÃO IDENTIFICADO' ? 60 : 90
       });
     }
     
@@ -454,9 +559,10 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
   
   // Pattern 2: Fallback - line by line parsing with improved name extraction
   if (packages.length === 0) {
-    logger.info('Parse', 'Tentando padrão alternativo (linha por linha)');
-    
-    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    logger.info('Parse', 'Tentando padrão alternativo (linha por linha com normalização)');
+   
+    // CRITICAL FIX: Normalize lines to join broken recipient names
+    const lines = normalizeLinesForNames(text, logger);
     let debugCount = 0;
     
     for (let i = 0; i < lines.length; i++) {
@@ -487,9 +593,12 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
         // IMPROVED: Multi-strategy name extraction
         let recipient = 'NOME NÃO IDENTIFICADO';
         
-        // Strategy 1: Name after tracking code with improved lookahead (stops at : or | or next tracking code)
+        // Strategy 1: Name directly after tracking code (most common)
+        // Matches: AN246666127BR VANUSA NOVAIS RODRIGUES
+        // Captures everything after code until : or & or ___ or end of line
+        // Non-greedy match but ensures we get full names (2-4 words typically)
         const afterCodeMatch = line.match(new RegExp(
-          code + '\\s+([A-ZÀ-Ú][A-Za-zÀ-ú\\s.\\-]{3,60}?)(?=\\s*:|\\s*\\||\\s+[A-Z]{2}\\d{9}[A-Z]{2}|$)'
+          code + '\\s*([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+(?:\\s+[A-ZÀ-Úa-zà-ú]+){1,4})(?=\\s*:|\\s*&|\\s*___|\\s*\\||\\s*$)'
         ));
         if (afterCodeMatch && afterCodeMatch[1]) {
           const candidateName = cleanRecipientName(afterCodeMatch[1]);
@@ -498,10 +607,11 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
           }
         }
         
-        // Strategy 1.5: Name after code with prepositions (de/da/dos/das/e)
+        // Strategy 2: Name with prepositions (de/da/dos/das/e)
+        // More flexible pattern that allows mixed case
         if (recipient === 'NOME NÃO IDENTIFICADO') {
           const improvedMatch = line.match(new RegExp(
-            code + '\\s+([A-ZÀ-Ú][a-zà-ú]+(?:\\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][a-zà-ú]+))+)(?=\\s*:|\\s*$|\\s*\\|)'
+            code + '\\s*([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+(?:\\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+))+)(?=\\s*:|\\s*&|\\s*___|\\s*$|\\s*\\|)'
           ));
           if (improvedMatch && improvedMatch[1]) {
             const candidateName = cleanRecipientName(improvedMatch[1]);
@@ -511,7 +621,21 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
           }
         }
         
-        // Strategy 2: If failed, look in the next line (if it doesn't contain a tracking code)
+        // Strategy 3: Extract all uppercase words after code (common in LDI format)
+        // Matches sequences like: MARIA SUELI COSTA or VANUSA NOVAIS RODRIGUES
+        if (recipient === 'NOME NÃO IDENTIFICADO') {
+          const upperCaseMatch = line.match(new RegExp(
+            code + '\\s*([A-ZÀ-Ú][A-ZÀ-Ú\\s]+?)(?=\\s*:|\\s*&|\\s*___|\\s*$)'
+          ));
+          if (upperCaseMatch && upperCaseMatch[1]) {
+            const candidateName = cleanRecipientName(upperCaseMatch[1]);
+            if (candidateName !== 'NOME NÃO IDENTIFICADO' && candidateName.split(' ').length >= 2) {
+              recipient = candidateName;
+            }
+          }
+        }
+        
+        // Strategy 4: Look in the next line (if it doesn't contain a tracking code)
         if (recipient === 'NOME NÃO IDENTIFICADO' && i + 1 < lines.length) {
           const nextLine = lines[i + 1];
           // If next line doesn't contain tracking code, might be name continuation
@@ -526,17 +650,21 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
           }
         }
         
-        // Strategy 3: Find any valid name pattern in the line
+        // Strategy 5: Find any valid name pattern in the line (broader search)
         if (recipient === 'NOME NÃO IDENTIFICADO') {
           // Look for pattern: First Last (with possible middle names)
-          const namePatterns = line.match(/[A-ZÀ-Ú][a-zA-ZÀ-ú]+\s+[A-ZÀ-Ú][a-zA-ZÀ-ú]+(?:\s+[A-Za-zÀ-ú]+)*/g);
+          // More flexible - allows all caps or mixed case
+          const namePatterns = line.match(/[A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+(?:\s+[A-ZÀ-Úa-zà-ú]+)+/g);
           if (namePatterns) {
             for (const pattern of namePatterns) {
               // Skip if pattern looks like address (contains RUA, AV, etc.)
-              if (/\b(RUA|AV|AVENIDA|TRAVESSA|ESTRADA|RODOVIA|BR|KM)\b/i.test(pattern)) continue;
+              if (/\b(RUA|AV|AVENIDA|TRAVESSA|ESTRADA|RODOVIA|BR|KM|RECEBEDOR|ASSINATURA)\b/i.test(pattern)) continue;
+              
+              // Skip if it's just the tracking code
+              if (TRACKING_CODE_REGEX.test(pattern.replace(/\s/g, ''))) continue;
               
               const candidateName = cleanRecipientName(pattern);
-              if (candidateName !== 'NOME NÃO IDENTIFICADO' && candidateName.length >= 5) {
+              if (candidateName !== 'NOME NÃO IDENTIFICADO' && candidateName.split(' ').length >= 2) {
                 recipient = candidateName;
                 break;
               }
@@ -544,9 +672,9 @@ function parseTextContent(text: string, logger: PDFLogger): PackageData[] {
           }
         }
         
-        // Strategy 4: Name BEFORE tracking code (alternative format)
+        // Strategy 6: Name BEFORE tracking code (alternative format)
         if (recipient === 'NOME NÃO IDENTIFICADO') {
-          const beforeCodeMatch = line.match(/([A-ZÀ-Ú][a-zà-ú]+(?:\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][a-zà-ú]+))+)\s+[A-Z]{2}\d{9}[A-Z]{2}/);
+          const beforeCodeMatch = line.match(/([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+(?:\s+(?:de|da|do|dos|das|e|[A-ZÀ-Ú][A-ZÀ-Úa-zà-ú]+))+)\s+[A-Z]{2}\d{9}[A-Z]{2}/);
           if (beforeCodeMatch && beforeCodeMatch[1]) {
             const candidateName = cleanRecipientName(beforeCodeMatch[1]);
             if (candidateName !== 'NOME NÃO IDENTIFICADO') {

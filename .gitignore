@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+LISTA04122025VAA.pdf
 
 # Editor directories and files
 .vscode/*

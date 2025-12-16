@@ -93,19 +93,19 @@ const statusConfig = {
   devolvido: { label: "Devolvido", icon: XCircle, class: "bg-destructive/10 text-destructive" },
 };
 
-// Mapeamento de tabs para permissões necessárias
+// Mapeamento de tabs para permissões necessárias (usando chaves em português conforme salvo no banco)
 const tabPermissions: Record<ActiveTab, string | null> = {
-  encomendas: "packages",
-  noticias: "news",
-  ocorrencias: "occurrences",
-  comercios: "businesses",
-  quadras: "courts",
-  agendamentos: "courts",
-  whatsapp: "settings",
-  bot: "settings",
-  pagina: "settings",
-  cores: "settings",
-  usuarios: "users",
+  encomendas: "encomendas",
+  noticias: "noticias",
+  ocorrencias: "ocorrencias",
+  comercios: "comercios",
+  quadras: "quadras",
+  agendamentos: "agendamentos",
+  whatsapp: "pagina",
+  bot: "pagina",
+  pagina: "pagina",
+  cores: "pagina",
+  usuarios: "usuarios",
 };
 
 const navItems = [

@@ -239,7 +239,7 @@ export default function Encomendas() {
             <li>• Encomendas ficam disponíveis por <strong>7 dias</strong> após a chegada</li>
             <li>• Após o prazo, a encomenda será devolvida aos Correios</li>
             <li>• Retire sua encomenda na administração com documento de identificação</li>
-            <li>• Horário de funcionamento: Segunda a Sexta, das 8h às 17h</li>
+            <li>• Horário de funcionamento: Segunda a Sexta, das 8h às 13h</li>
           </ul>
         </div>
       </div>

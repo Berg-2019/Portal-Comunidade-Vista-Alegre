@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+Portal Comunidade Vista Alegre
+Portal web voltado para divulgação de informações, serviços e novidades relacionadas à Comunidade Vista Alegre, facilitando o acesso da população a conteúdo atualizado e organizado sobre o bairro/região.
+URL: https://minhavistaalegre.com.br/
 
-## Project info
+Visão geral
+O objetivo do projeto é oferecer um ponto central de comunicação para a comunidade, reunindo notícias, eventos, contatos úteis e outros recursos em uma interface simples e responsiva.​
+O repositório serve como base de versionamento do código, permitindo colaboração, histórico de alterações e implantação contínua do portal em ambiente de produção.​
 
-**URL**: https://lovable.dev/projects/d6800c75-d391-434d-ace5-6288b5fe6a4c
+Funcionalidades principais
+Página inicial com visão geral da comunidade e destaques de conteúdo.
 
-## How can I edit this code?
+Seções para notícias, comunicados e eventos locais.
 
-There are several ways of editing your application.
+Área para informações institucionais, contatos e serviços relevantes.
 
-**Use Lovable**
+Layout responsivo, adequado para acesso via computador e dispositivos móveis.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d6800c75-d391-434d-ace5-6288b5fe6a4c) and start prompting.
+Tecnologias utilizadas
+HTML, CSS e JavaScript para estrutura, estilização e interatividade do front-end.
 
-Changes made via Lovable will be committed automatically to this repo.
+Integração com serviços externos (quando necessário) para formulários, métricas ou hospedagem.
 
-**Use your preferred IDE**
+Git e GitHub para versionamento de código, controle de issues e colaboração entre contribuidores.​
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Como executar o projeto
+Clone o repositório:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+bash
+git clone https://github.com/Berg-2019/Portal-Comunidade-Vista-Alegre.git
+Acesse o diretório:
 
-Follow these steps:
+bash
+cd Portal-Comunidade-Vista-Alegre
+Abra o arquivo principal (por exemplo, index.html) no navegador ou sirva o projeto com um servidor HTTP simples (como extensões de Live Server ou servidores estáticos em linha de comando).
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Se o projeto utilizar um gerenciador de pacotes ou build (como Node.js), adicione aqui os comandos necessários de instalação e build.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Estrutura do repositório
+index.html: Página principal do portal.
 
-# Step 3: Install the necessary dependencies.
-npm i
+assets/ ou public/: Recursos estáticos como imagens, ícones e fontes.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+css/ ou styles/: Arquivos de estilo.
 
-**Edit a file directly in GitHub**
+js/ ou scripts/: Arquivos de lógica de front-end.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+A estrutura pode variar conforme a evolução do projeto; mantenha esta seção atualizada sempre que novos diretórios ou módulos forem adicionados.​
 
-**Use GitHub Codespaces**
+Contribuindo
+Contribuições são bem-vindas para melhorar o portal, corrigir problemas ou adicionar novas funcionalidades.​
+Para contribuir:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Faça um fork do repositório.
 
-## What technologies are used for this project?
+Crie uma branch para sua feature ou correção:
 
-This project is built with:
+bash
+git checkout -b minha-feature
+Envie um pull request descrevendo claramente as mudanças propostas.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/d6800c75-d391-434d-ace5-6288b5fe6a4c) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Licença

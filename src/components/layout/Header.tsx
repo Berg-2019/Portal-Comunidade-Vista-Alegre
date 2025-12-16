@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Início", href: "/", icon: Home },
-  { label: "Notícias", href: "/noticias", icon: Newspaper },
-  { label: "Ocorrências", href: "/ocorrencias", icon: AlertTriangle },
-  { label: "Comércios", href: "/comercios", icon: Store },
-  { label: "Quadras", href: "/quadras", icon: Calendar },
   { label: "Encomendas", href: "/encomendas", icon: Package },
+  { label: "Ocorrências", href: "/ocorrencias", icon: AlertTriangle },
+  { label: "Notícias", href: "/noticias", icon: Newspaper },
+  { label: "Quadras", href: "/quadras", icon: Calendar },
+  { label: "Comércios", href: "/comercios", icon: Store },
   { label: "Comunidade", href: "/comunidade", icon: MessageCircle },
   { label: "Contatos", href: "/contatos-uteis", icon: Phone },
 ];

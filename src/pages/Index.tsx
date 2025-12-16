@@ -145,10 +145,10 @@ export default function Index() {
               Notícias, serviços e informações em um só lugar.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up flex-wrap" style={{ animationDelay: "0.3s" }}>
-              <Link to="/noticias">
+              <Link to="/encomendas">
                 <Button size="lg" className="w-full sm:w-auto bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg">
-                  <Newspaper className="h-5 w-5 mr-2" />
-                  Ver Notícias
+                  <Package className="h-5 w-5 mr-2" />
+                  Ver Encomendas
                 </Button>
               </Link>
               {getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.') ? (

@@ -16,7 +16,7 @@ interface TimeSlot {
   start_time: string;
   end_time: string;
   day_of_week: number;
-  is_available: boolean;
+  available: boolean;
 }
 
 export class CourtHandler {
@@ -115,7 +115,7 @@ export class CourtHandler {
         `/api/courts/${session.data.courtId}/slots?day_of_week=${dayOfWeek}`
       );
       
-      const slots: TimeSlot[] = response.data.slots.filter((s: TimeSlot) => s.is_available);
+      const slots: TimeSlot[] = response.data.slots.filter((s: TimeSlot) => s.available !== false);
       
       if (slots.length === 0) {
         await sock.sendMessage(jid, { 

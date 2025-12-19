@@ -9,6 +9,9 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Clock,
+  CalendarDays,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +30,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Schedule {
   id: number;
@@ -43,6 +50,22 @@ interface Schedule {
   responsible: string;
   phone?: string;
   active: boolean;
+  created_at: string;
+}
+
+interface Reservation {
+  id: number;
+  court_id: number;
+  court_name?: string;
+  court_type?: string;
+  user_name: string;
+  user_phone: string;
+  reservation_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  source: string;
+  notes?: string;
   created_at: string;
 }
 
@@ -69,13 +92,23 @@ const PROJECT_TYPES = [
   { value: "outro", label: "Outro" },
 ] as const;
 
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  confirmed: { label: "Confirmada", color: "bg-success/10 text-success" },
+  cancelled: { label: "Cancelada", color: "bg-destructive/10 text-destructive" },
+  completed: { label: "Concluída", color: "bg-info/10 text-info" },
+  pending: { label: "Pendente", color: "bg-warning/10 text-warning" },
+};
+
 export default function AdminScheduleManager() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
+  const [activeTab, setActiveTab] = useState("reservas");
+  const [reservationFilter, setReservationFilter] = useState("upcoming");
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -96,12 +129,14 @@ export default function AdminScheduleManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [courtsData, schedulesData] = await Promise.all([
+      const [courtsData, schedulesData, reservationsData] = await Promise.all([
         api.getCourts(),
         api.getSchedules(),
+        api.getReservations(),
       ]);
       setCourts(courtsData);
       setSchedules(schedulesData);
+      setReservations(reservationsData);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -228,6 +263,38 @@ export default function AdminScheduleManager() {
     }
   };
 
+  const handleUpdateReservationStatus = async (id: number, status: string) => {
+    try {
+      await api.updateReservation(id.toString(), { status });
+      setReservations((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status } : r))
+      );
+      toast({ title: `Reserva ${status === 'completed' ? 'concluída' : status === 'cancelled' ? 'cancelada' : 'atualizada'}!` });
+    } catch (error) {
+      console.error("Error updating reservation:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar reserva",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteReservation = async (id: number) => {
+    try {
+      await api.deleteReservation(id.toString());
+      setReservations((prev) => prev.filter((r) => r.id !== id));
+      toast({ title: "Reserva excluída!" });
+    } catch (error) {
+      console.error("Error deleting reservation:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir reserva",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getCourtName = (courtId: number) => {
     return courts.find((c) => c.id === courtId)?.name || "Quadra não encontrada";
   };
@@ -242,6 +309,38 @@ export default function AdminScheduleManager() {
     schedules: schedules.filter((s) => s.day_of_week === index),
   })).filter((group) => group.schedules.length > 0);
 
+  // Filter reservations
+  const today = new Date().toISOString().split('T')[0];
+  const filteredReservations = reservations.filter((r) => {
+    if (reservationFilter === "upcoming") {
+      return r.reservation_date >= today && r.status === 'confirmed';
+    }
+    if (reservationFilter === "today") {
+      return r.reservation_date === today;
+    }
+    if (reservationFilter === "past") {
+      return r.reservation_date < today || r.status === 'completed';
+    }
+    if (reservationFilter === "cancelled") {
+      return r.status === 'cancelled';
+    }
+    return true;
+  }).sort((a, b) => {
+    const dateCompare = a.reservation_date.localeCompare(b.reservation_date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.start_time.localeCompare(b.start_time);
+  });
+
+  // Group reservations by date
+  const groupedReservations = filteredReservations.reduce((acc, reservation) => {
+    const date = reservation.reservation_date;
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(reservation);
+    return acc;
+  }, {} as Record<string, Reservation[]>);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -252,177 +351,385 @@ export default function AdminScheduleManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Gerencie os horários fixos reservados para escolinhas e projetos sociais
-          </p>
-        </div>
-        <Button onClick={openCreateModal}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Agendamento
-        </Button>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="reservas" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Reservas ({reservations.filter(r => r.status === 'confirmed' && r.reservation_date >= today).length})
+          </TabsTrigger>
+          <TabsTrigger value="fixos" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Horários Fixos ({schedules.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Calendar className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold">{schedules.length}</p>
-            </div>
+        {/* Reservas Tab */}
+        <TabsContent value="reservas" className="space-y-6 mt-6">
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={reservationFilter === "upcoming" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReservationFilter("upcoming")}
+            >
+              Próximas
+            </Button>
+            <Button
+              variant={reservationFilter === "today" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReservationFilter("today")}
+            >
+              Hoje
+            </Button>
+            <Button
+              variant={reservationFilter === "past" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReservationFilter("past")}
+            >
+              Anteriores
+            </Button>
+            <Button
+              variant={reservationFilter === "cancelled" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReservationFilter("cancelled")}
+            >
+              Canceladas
+            </Button>
+            <Button
+              variant={reservationFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReservationFilter("all")}
+            >
+              Todas
+            </Button>
           </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10">
-              <CheckCircle className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Ativos</p>
-              <p className="text-2xl font-bold">
-                {schedules.filter((s) => s.active).length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-info/10">
-              <Users className="h-5 w-5 text-info" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Escolinhas</p>
-              <p className="text-2xl font-bold">
-                {schedules.filter((s) => s.project_type === "escola").length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10">
-              <Users className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Projetos</p>
-              <p className="text-2xl font-bold">
-                {schedules.filter((s) => s.project_type === "projeto_social").length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Schedule List by Day */}
-      {groupedByDay.length === 0 ? (
-        <div className="bg-card rounded-xl p-12 shadow-sm border border-border text-center">
-          <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">Nenhum agendamento fixo cadastrado</p>
-          <Button className="mt-4" onClick={openCreateModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Criar primeiro agendamento
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {groupedByDay.map((group) => (
-            <div key={group.dayIndex} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-              <div className="bg-muted px-6 py-3">
-                <h3 className="font-heading font-semibold">{group.day}</h3>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold">{reservations.length}</p>
+                </div>
               </div>
-              <div className="divide-y divide-border">
-                {group.schedules.map((schedule) => (
-                  <div
-                    key={schedule.id}
-                    className={cn(
-                      "p-4 transition-colors",
-                      !schedule.active && "opacity-50"
-                    )}
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-full text-xs font-medium",
-                              schedule.active
-                                ? "bg-success/10 text-success"
-                                : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {schedule.active ? "Ativo" : "Inativo"}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {getProjectTypeLabel(schedule.project_type)}
-                          </span>
-                        </div>
-                        <h4 className="font-medium text-lg">{schedule.project_name}</h4>
-                        <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                          <p className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            {schedule.court_name || getCourtName(schedule.court_id)}
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)}
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            {schedule.responsible}
-                          </p>
-                          {schedule.phone && (
-                            <p className="flex items-center gap-2">
-                              <Phone className="h-4 w-4" />
-                              {schedule.phone}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleActive(schedule.id)}
-                          title={schedule.active ? "Desativar" : "Ativar"}
-                        >
-                          {schedule.active ? (
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 text-success" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditModal(schedule)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(schedule.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
+            </div>
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-success/10">
+                  <CheckCircle className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Confirmadas</p>
+                  <p className="text-2xl font-bold">
+                    {reservations.filter((r) => r.status === 'confirmed').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-info/10">
+                  <Calendar className="h-5 w-5 text-info" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Hoje</p>
+                  <p className="text-2xl font-bold">
+                    {reservations.filter((r) => r.reservation_date === today).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-warning/10">
+                  <Clock className="h-5 w-5 text-warning" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Próximas</p>
+                  <p className="text-2xl font-bold">
+                    {reservations.filter((r) => r.reservation_date >= today && r.status === 'confirmed').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Reservations List */}
+          {Object.keys(groupedReservations).length === 0 ? (
+            <div className="bg-card rounded-xl p-12 shadow-sm border border-border text-center">
+              <CalendarDays className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Nenhuma reserva encontrada</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(groupedReservations).map(([date, dateReservations]) => (
+                <div key={date} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                  <div className="bg-muted px-6 py-3">
+                    <h3 className="font-heading font-semibold">
+                      {format(new Date(date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                    </h3>
                   </div>
-                ))}
+                  <div className="divide-y divide-border">
+                    {dateReservations.map((reservation) => (
+                      <div
+                        key={reservation.id}
+                        className={cn(
+                          "p-4 transition-colors",
+                          reservation.status === 'cancelled' && "opacity-50"
+                        )}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge className={STATUS_MAP[reservation.status]?.color || "bg-muted"}>
+                                {STATUS_MAP[reservation.status]?.label || reservation.status}
+                              </Badge>
+                              <Badge variant="outline">
+                                {reservation.source === 'whatsapp' ? 'WhatsApp' : reservation.source}
+                              </Badge>
+                            </div>
+                            <h4 className="font-medium text-lg flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              {reservation.user_name}
+                            </h4>
+                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                              <p className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                {reservation.court_name || getCourtName(reservation.court_id)}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {reservation.start_time.slice(0, 5)} - {reservation.end_time.slice(0, 5)}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                {reservation.user_phone}
+                              </p>
+                              {reservation.notes && (
+                                <p className="text-xs italic mt-1">Obs: {reservation.notes}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {reservation.status === 'confirmed' && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateReservationStatus(reservation.id, 'completed')}
+                                  title="Marcar como concluída"
+                                >
+                                  <CheckCircle className="h-4 w-4 text-success" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateReservationStatus(reservation.id, 'cancelled')}
+                                  title="Cancelar"
+                                >
+                                  <XCircle className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteReservation(reservation.id)}
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Horários Fixos Tab */}
+        <TabsContent value="fixos" className="space-y-6 mt-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Gerencie os horários fixos reservados para escolinhas e projetos sociais
+              </p>
+            </div>
+            <Button onClick={openCreateModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Agendamento
+            </Button>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold">{schedules.length}</p>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-success/10">
+                  <CheckCircle className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Ativos</p>
+                  <p className="text-2xl font-bold">
+                    {schedules.filter((s) => s.active).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-info/10">
+                  <Users className="h-5 w-5 text-info" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Escolinhas</p>
+                  <p className="text-2xl font-bold">
+                    {schedules.filter((s) => s.project_type === "escola").length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl p-4 shadow-sm border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-warning/10">
+                  <Users className="h-5 w-5 text-warning" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Projetos</p>
+                  <p className="text-2xl font-bold">
+                    {schedules.filter((s) => s.project_type === "projeto_social").length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-      {/* Modal */}
+          {/* Schedule List by Day */}
+          {groupedByDay.length === 0 ? (
+            <div className="bg-card rounded-xl p-12 shadow-sm border border-border text-center">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Nenhum agendamento fixo cadastrado</p>
+              <Button className="mt-4" onClick={openCreateModal}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar primeiro agendamento
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {groupedByDay.map((group) => (
+                <div key={group.dayIndex} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                  <div className="bg-muted px-6 py-3">
+                    <h3 className="font-heading font-semibold">{group.day}</h3>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {group.schedules.map((schedule) => (
+                      <div
+                        key={schedule.id}
+                        className={cn(
+                          "p-4 transition-colors",
+                          !schedule.active && "opacity-50"
+                        )}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-xs font-medium",
+                                  schedule.active
+                                    ? "bg-success/10 text-success"
+                                    : "bg-muted text-muted-foreground"
+                                )}
+                              >
+                                {schedule.active ? "Ativo" : "Inativo"}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                {getProjectTypeLabel(schedule.project_type)}
+                              </span>
+                            </div>
+                            <h4 className="font-medium text-lg">{schedule.project_name}</h4>
+                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                              <p className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                {schedule.court_name || getCourtName(schedule.court_id)}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                {schedule.responsible}
+                              </p>
+                              {schedule.phone && (
+                                <p className="flex items-center gap-2">
+                                  <Phone className="h-4 w-4" />
+                                  {schedule.phone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleActive(schedule.id)}
+                              title={schedule.active ? "Desativar" : "Ativar"}
+                            >
+                              {schedule.active ? (
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 text-success" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(schedule)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(schedule.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Modal for Fixed Schedules */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

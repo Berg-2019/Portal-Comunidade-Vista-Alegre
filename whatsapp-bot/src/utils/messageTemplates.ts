@@ -106,7 +106,7 @@ ou digite *menu* a qualquer momento`;
   }
 
   static reservationConfirmation(data: ReservationData): string {
-    return `✅ *RESERVA SOLICITADA!*
+    return `✅ *RESERVA CONFIRMADA!*
 
 📋 *Detalhes:*
 • Quadra: ${data.courtName}
@@ -114,8 +114,11 @@ ou digite *menu* a qualquer momento`;
 • Horário: ${data.startTime} - ${data.endTime}
 • Nome: ${data.name}
 
+🎉 Sua reserva foi aprovada automaticamente! Compareça no horário agendado.
+
 ⚠️ *Importante:*
-Sua reserva foi registrada e está aguardando confirmação. Você receberá uma notificação quando for aprovada.
+• Chegue com 10 minutos de antecedência
+• Em caso de desistência, cancele com antecedência
 
 ━━━━━━━━━━━━━━━━━━
 Digite *menu* para voltar ao início`;

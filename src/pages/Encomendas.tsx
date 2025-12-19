@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Package, Search, Clock, AlertCircle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,49 +40,125 @@ const statusConfig = {
   },
 };
 
+const ITEMS_PER_PAGE = 20;
+
 export default function Encomendas() {
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PackageStatus | "ALL">("ALL");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [stats, setStats] = useState({ total: 0, aguardando: 0, entregue: 0, devolvido: 0 });
+  
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    loadPackages();
-  }, []);
-
-  const loadPackages = async () => {
+  // Load packages with pagination
+  const loadPackages = useCallback(async (pageNum: number, append = false) => {
     try {
-      setLoading(true);
-      const data = await api.getPackages();
-      setPackages(data);
+      if (pageNum === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const response = await api.getPackages({
+        search: searchTerm || undefined,
+        status: statusFilter !== "ALL" ? statusFilter : undefined,
+        page: pageNum,
+        limit: ITEMS_PER_PAGE,
+      });
+
+      const newPackages = response.data;
+      
+      if (append) {
+        setPackages(prev => [...prev, ...newPackages]);
+      } else {
+        setPackages(newPackages);
+      }
+
+      setHasMore(response.pagination.hasMore);
+      
+      // Update stats from first page load (total counts)
+      if (pageNum === 1 && !searchTerm && statusFilter === "ALL") {
+        // For accurate stats, we need all packages - use a separate call or compute from pagination
+        const statsResponse = await api.getPackages({ limit: 1 });
+        // Get stats by status
+        const allPackagesResponse = await api.getPackages({ limit: 1000 }); // Get all for stats
+        const allPkgs = allPackagesResponse.data;
+        setStats({
+          total: allPackagesResponse.pagination.total,
+          aguardando: allPkgs.filter(p => p.status === "aguardando").length,
+          entregue: allPkgs.filter(p => p.status === "entregue").length,
+          devolvido: allPkgs.filter(p => p.status === "devolvido").length,
+        });
+      }
     } catch (error) {
       console.error("Erro ao carregar encomendas:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  };
+  }, [searchTerm, statusFilter]);
 
-  const filteredPackages = packages.filter((pkg) => {
-    const matchesSearch = 
-      pkg.recipient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.tracking_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "ALL" || pkg.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Initial load and filter changes
+  useEffect(() => {
+    setPage(1);
+    setPackages([]);
+    loadPackages(1, false);
+  }, [statusFilter]);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setPage(1);
+      setPackages([]);
+      loadPackages(1, false);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && hasMore && !loading && !loadingMore) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          loadPackages(nextPage, true);
+        }
+      },
+      { rootMargin: "100px" }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, loading, loadingMore, page, loadPackages]);
 
   const getDaysRemaining = (deadline: string): number => {
     const today = new Date();
     return daysDifference(today, deadline);
   };
 
-  const stats = {
-    total: packages.length,
-    aguardando: packages.filter(p => p.status === "aguardando").length,
-    entregue: packages.filter(p => p.status === "entregue").length,
-    devolvido: packages.filter(p => p.status === "devolvido").length,
-  };
-
-  if (loading) {
+  if (loading && packages.length === 0) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -155,18 +231,18 @@ export default function Encomendas() {
         </div>
 
         {/* Package List */}
-        {filteredPackages.length === 0 ? (
+        {packages.length === 0 && !loading ? (
           <div className="text-center py-12 bg-card rounded-xl">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              {packages.length === 0 
-                ? "Nenhuma encomenda cadastrada no momento." 
-                : "Nenhuma encomenda encontrada com os filtros aplicados."}
+              {searchTerm || statusFilter !== "ALL"
+                ? "Nenhuma encomenda encontrada com os filtros aplicados." 
+                : "Nenhuma encomenda cadastrada no momento."}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredPackages.map((pkg, index) => {
+            {packages.map((pkg, index) => {
               const config = statusConfig[pkg.status];
               const Icon = config.icon;
               const daysRemaining = getDaysRemaining(pkg.pickup_deadline);
@@ -179,7 +255,7 @@ export default function Encomendas() {
                     "bg-card rounded-xl p-6 shadow-sm border transition-all animate-fade-up hover-lift",
                     config.class
                   )}
-                  style={{ animationDelay: `${index * 0.05}s` }}
+                  style={{ animationDelay: `${Math.min(index, 10) * 0.05}s` }}
                 >
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
@@ -229,6 +305,24 @@ export default function Encomendas() {
                 </div>
               );
             })}
+
+            {/* Sentinel for infinite scroll */}
+            <div ref={sentinelRef} className="h-4" />
+
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Carregando mais...</span>
+              </div>
+            )}
+
+            {/* End of list message */}
+            {!hasMore && packages.length > 0 && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                Todas as encomendas carregadas
+              </div>
+            )}
           </div>
         )}
 

@@ -178,12 +178,28 @@ class ApiService {
   }
 
   // Package methods
-  async getPackages(search?: string, status?: string) {
-    const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    if (status && status !== 'ALL') params.append('status', status);
-    const queryString = params.toString();
-    return this.request<any[]>(`/api/packages${queryString ? `?${queryString}` : ''}`, {
+  async getPackages(params?: { 
+    search?: string; 
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status && params.status !== 'ALL') queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    const queryString = queryParams.toString();
+    return this.request<{
+      data: any[];
+      pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        hasMore: boolean;
+      };
+    }>(`/api/packages${queryString ? `?${queryString}` : ''}`, {
       authenticated: false,
     });
   }

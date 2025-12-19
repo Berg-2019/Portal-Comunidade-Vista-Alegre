@@ -74,12 +74,41 @@ setInterval(() => {
   cleanExpiredCache();
 }, 6 * 60 * 60 * 1000);
 
-// Public: Get packages (for public consultation)
+// Public: Get packages (for public consultation) with pagination
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { search, status } = req.query;
+    const { search, status, page = '1', limit = '20' } = req.query;
     
-    let queryText = `SELECT 
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build WHERE clause
+    let whereClause = 'WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (search) {
+      whereClause += ` AND (LOWER(recipient_name) LIKE LOWER($${paramIndex}) OR LOWER(tracking_code) LIKE LOWER($${paramIndex}))`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    if (status && status !== 'ALL') {
+      whereClause += ` AND status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
+    }
+
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM packages ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    // Get paginated data
+    const dataQuery = `SELECT 
       id, 
       recipient_name, 
       tracking_code, 
@@ -90,25 +119,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       pdf_source,
       created_at,
       updated_at
-    FROM packages WHERE 1=1`;
-    const params: any[] = [];
-    let paramIndex = 1;
+    FROM packages ${whereClause}
+    ORDER BY arrival_date DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
-    if (search) {
-      queryText += ` AND (LOWER(recipient_name) LIKE LOWER($${paramIndex}) OR LOWER(tracking_code) LIKE LOWER($${paramIndex}))`;
-      params.push(`%${search}%`);
-      paramIndex++;
-    }
-
-    if (status && status !== 'ALL') {
-      queryText += ` AND status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
-    }
-
-    queryText += ' ORDER BY arrival_date DESC';
-
-    const result = await query(queryText, params);
+    const result = await query(dataQuery, [...params, limitNum, offset]);
     
     // Calculate remaining days for each package
     const packages = result.rows.map(pkg => {
@@ -123,7 +138,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       };
     });
 
-    res.json(packages);
+    const totalPages = Math.ceil(total / limitNum);
+
+    res.json({
+      data: packages,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+        hasMore: pageNum < totalPages
+      }
+    });
   } catch (error) {
     console.error('Error fetching packages:', error);
     res.status(500).json({ error: 'Error fetching packages' });

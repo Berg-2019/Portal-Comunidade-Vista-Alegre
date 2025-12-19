@@ -168,7 +168,7 @@ export default function AdminDashboard() {
   const loadPackages = async () => {
     try {
       setLoadingPackages(true);
-      const data = await api.getPackages();
+      const data = await api.getAllPackages();
       setPackages(data);
     } catch (error) {
       console.error("Erro ao carregar encomendas:", error);

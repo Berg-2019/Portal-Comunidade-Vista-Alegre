@@ -7,7 +7,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:migrate": "tsx src/scripts/migrate.ts"
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "setup:python": "python3 -m venv venv && . venv/bin/activate && pip install -r src/services/docling/requirements.txt",
+    "setup:python:win": "python -m venv venv && venv\\Scripts\\activate && pip install -r src/services/docling/requirements.txt",
+    "docling:check": "python3 -c \"import docling; print('Docling OK')\"",
+    "postinstall": "echo 'Para usar Docling (extração avançada de PDF), execute: npm run setup:python'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

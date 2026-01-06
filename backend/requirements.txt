@@ -1,0 +1,5 @@
+# Dependências Python para extração de PDF com Docling
+# Instaladas no container Docker do backend
+
+docling>=2.0.0
+pandas>=2.0.0

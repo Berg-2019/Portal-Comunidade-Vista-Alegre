@@ -8,6 +8,9 @@ import {
   Search,
   FileText,
   Loader2,
+  Video,
+  Link,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
 import ImageUpload from "./ImageUpload";
+import VideoUpload from "./VideoUpload";
 
 interface News {
   id: number;
@@ -71,6 +75,7 @@ export default function AdminNewsManager() {
     video_url: "",
     published: false,
   });
+  const [videoInputType, setVideoInputType] = useState<'url' | 'upload'>('url');
 
   useEffect(() => {
     loadData();
@@ -113,6 +118,7 @@ export default function AdminNewsManager() {
 
   const openCreateModal = () => {
     resetForm();
+    setVideoInputType('url');
     setIsModalOpen(true);
   };
 
@@ -127,6 +133,15 @@ export default function AdminNewsManager() {
       video_url: news.video_url || "",
       published: news.published,
     });
+    
+    // Detect video input type based on URL
+    if (news.video_url) {
+      const isYouTube = news.video_url.includes('youtube') || news.video_url.includes('youtu.be');
+      setVideoInputType(isYouTube ? 'url' : 'upload');
+    } else {
+      setVideoInputType('url');
+    }
+    
     setIsModalOpen(true);
   };
 
@@ -331,8 +346,51 @@ export default function AdminNewsManager() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="videoUrl">URL do Vídeo (YouTube)</Label>
-              <Input id="videoUrl" value={formData.video_url} onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} placeholder="https://youtube.com/watch?v=..." />
+              <Label>Vídeo da Notícia</Label>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  type="button"
+                  variant={videoInputType === 'url' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVideoInputType('url')}
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  URL do YouTube
+                </Button>
+                <Button
+                  type="button"
+                  variant={videoInputType === 'upload' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVideoInputType('upload')}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload de Vídeo
+                </Button>
+              </div>
+              
+              {videoInputType === 'url' ? (
+                <Input 
+                  id="videoUrl" 
+                  value={formData.video_url} 
+                  onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} 
+                  placeholder="https://youtube.com/watch?v=..." 
+                />
+              ) : (
+                <VideoUpload 
+                  value={formData.video_url} 
+                  onChange={(url) => setFormData({ ...formData, video_url: url })} 
+                  category="news"
+                  maxSizeMB={100}
+                />
+              )}
+              
+              {formData.video_url && (
+                <p className="text-xs text-muted-foreground">
+                  {formData.video_url.includes('youtube') || formData.video_url.includes('youtu.be') 
+                    ? '🎬 Vídeo do YouTube' 
+                    : '📹 Vídeo enviado'}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

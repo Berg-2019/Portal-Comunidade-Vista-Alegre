@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Check, Loader2, AlertCircle, Trash2, Edit2, Calendar } from 'lucide-react';
+import { Upload, FileText, Check, Loader2, AlertCircle, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -70,10 +69,6 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
   const [pdfFilename, setPdfFilename] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   
-  // Datas do lote inteiro
-  const [batchArrivalDate, setBatchArrivalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [batchPickupDeadline, setBatchPickupDeadline] = useState('');
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -105,12 +100,14 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
       const result = await api.uploadPackagePdf(formData);
 
       if (result.success && result.results) {
-        // Aplica as datas do lote a todas as encomendas
+        // Usa as datas extraídas do PDF automaticamente
         const packagesWithSelection = result.results.packages.map((pkg: any) => ({
-          recipient_name: pkg.recipient_name || '',
-          tracking_code: pkg.tracking_code || '',
-          arrival_date: batchArrivalDate,
-          pickup_deadline: batchPickupDeadline,
+          recipient_name: pkg.recipient_name || pkg.recipient || '',
+          tracking_code: pkg.tracking_code || pkg.trackingCode || '',
+          // Usa a data de entrada extraída do PDF (dateISO ou arrival_date)
+          arrival_date: pkg.arrival_date || pkg.dateISO || format(new Date(), 'yyyy-MM-dd'),
+          // Usa o prazo de retirada extraído do PDF (pickupDeadline ou pickup_deadline)
+          pickup_deadline: pkg.pickup_deadline || pkg.pickupDeadline || '',
           selected: true,
         }));
         setExtractedPackages(packagesWithSelection);
@@ -123,9 +120,13 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
             variant: 'destructive',
           });
         } else {
+          // Verifica se as datas foram extraídas do PDF
+          const hasExtractedDates = packagesWithSelection.some((pkg: ExtractedPackage) => pkg.arrival_date && pkg.pickup_deadline);
           toast({
             title: 'PDF processado',
-            description: `${packagesWithSelection.length} encomendas extraídas. Defina as datas e confirme a importação.`,
+            description: hasExtractedDates 
+              ? `${packagesWithSelection.length} encomendas extraídas com datas do PDF. Revise e confirme a importação.`
+              : `${packagesWithSelection.length} encomendas extraídas. Revise as datas e confirme a importação.`,
           });
         }
       }
@@ -198,28 +199,11 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
     );
   };
 
-  // Aplica as datas do lote a todas as encomendas selecionadas
-  const applyBatchDates = () => {
-    setExtractedPackages(prev =>
-      prev.map(pkg => ({
-        ...pkg,
-        arrival_date: batchArrivalDate,
-        pickup_deadline: batchPickupDeadline,
-      }))
-    );
-    toast({
-      title: 'Datas aplicadas',
-      description: 'As datas foram aplicadas a todas as encomendas.',
-    });
-  };
-
   const handleClose = () => {
     setFile(null);
     setExtractedPackages([]);
     setPdfFilename('');
     setEditingIndex(null);
-    setBatchArrivalDate(format(new Date(), 'yyyy-MM-dd'));
-    setBatchPickupDeadline('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -282,43 +266,10 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
           {/* Extracted Packages Preview */}
           {extractedPackages.length > 0 && (
             <div className="space-y-4">
-              {/* Batch Date Settings */}
-              <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Datas do Lote</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="batch-arrival">Data de Entrada</Label>
-                    <Input
-                      id="batch-arrival"
-                      type="date"
-                      value={batchArrivalDate}
-                      onChange={(e) => setBatchArrivalDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="batch-deadline">Prazo para Retirada</Label>
-                    <Input
-                      id="batch-deadline"
-                      type="date"
-                      value={batchPickupDeadline}
-                      onChange={(e) => setBatchPickupDeadline(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button 
-                      variant="secondary" 
-                      onClick={applyBatchDates}
-                      className="w-full"
-                    >
-                      Aplicar a Todas
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Defina as datas acima e clique em "Aplicar a Todas" para atualizar todas as encomendas.
+              {/* Info sobre datas extraídas */}
+              <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  <strong>✓ Datas extraídas automaticamente do PDF.</strong> Você pode editar individualmente clicando no ícone de edição.
                 </p>
               </div>
 

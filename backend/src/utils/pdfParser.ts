@@ -3,6 +3,7 @@
  * 
  * Features:
  * - Multiple parsing strategies with automatic fallback
+ * - Docling (IBM) as primary extraction method
  * - Data validation and cleaning
  * - Structured logging
  * - Caching support
@@ -12,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import { PDFLogger } from './pdfLogger';
 import { getCachedResult, saveToCache } from './pdfCache';
+import { extractWithDocling, isDoclingAvailable, DoclingParseResult } from '../services/docling/doclingWrapper';
 
 // ============= Types =============
 
@@ -22,6 +24,8 @@ export interface PackageData {
   position: string;
   date: string;
   dateISO: string;
+  pickupDeadline?: string;
+  pickupDeadlineStr?: string;
   confidence: number;
 }
 
@@ -214,6 +218,57 @@ export function cleanPosition(position: string): string {
 // ============= PDF Parser Strategies =============
 
 /**
+ * Strategy 0 (Primary): Docling - IBM's advanced PDF parser with AI
+ * Uses Python subprocess to call the Docling library
+ */
+async function extractWithDoclingStrategy(filePath: string, logger: PDFLogger): Promise<ParseResult | null> {
+  try {
+    logger.info('Strategy', 'Tentando Docling (estratégia principal)');
+    
+    // Check if Docling is available
+    const available = await isDoclingAvailable();
+    if (!available) {
+      logger.warn('Strategy', 'Docling não está disponível, usando fallback');
+      return null;
+    }
+    
+    // Extract with Docling
+    const result = await extractWithDocling(filePath);
+    
+    if (!result.success || result.totalPackages === 0) {
+      logger.warn('Strategy', 'Docling não extraiu pacotes', { 
+        errors: result.errors,
+        warnings: result.warnings 
+      });
+      return null;
+    }
+    
+    logger.info('Strategy', `Docling extraiu ${result.totalPackages} pacotes com sucesso`);
+    
+    // Convert DoclingParseResult to ParseResult (they are compatible)
+    return {
+      success: result.success,
+      totalPackages: result.totalPackages,
+      packages: result.packages,
+      errors: result.errors,
+      warnings: result.warnings,
+      metadata: {
+        fileName: result.metadata.fileName,
+        fileSize: result.metadata.fileSize,
+        processingTime: result.metadata.processingTime,
+        strategy: 'docling',
+        expectedTotal: result.metadata.expectedTotal,
+        extractedTotal: result.metadata.extractedTotal,
+        pagesProcessed: result.metadata.pagesProcessed
+      }
+    };
+  } catch (error: any) {
+    logger.warn('Strategy', 'Docling falhou', { error: error.message });
+    return null;
+  }
+}
+
+/**
  * Strategy 1: pdf-parse v2.x (PDFParse class)
  */
 async function extractWithPdfParseV2(buffer: Buffer, logger: PDFLogger): Promise<RawTextResult | null> {
@@ -336,10 +391,13 @@ async function extractWithPdfJsDist(buffer: Buffer, logger: PDFLogger): Promise<
     let pdfjsLib: any = null;
     
     try {
-      pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      // Try the main module first
+      pdfjsLib = await import('pdfjs-dist');
     } catch {
       try {
-        pdfjsLib = await import('pdfjs-dist');
+        // Try legacy build as fallback
+        // @ts-ignore - dynamic import path
+        pdfjsLib = require('pdfjs-dist/legacy/build/pdf');
       } catch {
         logger.warn('Strategy', 'pdfjs-dist não disponível');
         return null;
@@ -805,6 +863,44 @@ export class CorreiosPDFParser {
           return cachedResult;
         }
       }
+      
+      // ============= STRATEGY 0 (PRIMARY): DOCLING =============
+      // Try Docling first - it's the most advanced and accurate method
+      const doclingResult = await extractWithDoclingStrategy(filePath, this.logger);
+      
+      if (doclingResult && doclingResult.success && doclingResult.totalPackages > 0) {
+        // Docling succeeded! Use its result directly
+        this.logger.info('Strategy', `✅ Docling extraiu ${doclingResult.totalPackages} pacotes com sucesso`);
+        
+        // Copy Docling result to our result
+        result.success = doclingResult.success;
+        result.totalPackages = doclingResult.totalPackages;
+        result.packages = doclingResult.packages;
+        result.errors = doclingResult.errors;
+        result.warnings = doclingResult.warnings;
+        result.metadata = doclingResult.metadata;
+        result.metadata.fileSize = buffer.length;
+        
+        // Save to cache
+        if (this.enableCache && result.success) {
+          await saveToCache(buffer, fileName, result);
+        }
+        
+        // Finalize and return early
+        result.metadata.processingTime = Date.now() - startTime;
+        
+        this.logger.info('Complete', `Processamento concluído em ${result.metadata.processingTime}ms (Docling)`, {
+          success: result.success,
+          packages: result.totalPackages,
+          strategy: result.metadata.strategy
+        });
+        
+        return result;
+      }
+      
+      // ============= FALLBACK STRATEGIES =============
+      // Docling failed or not available, try fallback strategies
+      this.logger.info('Strategy', 'Docling não disponível ou falhou, tentando estratégias alternativas...');
       
       // Try extraction strategies in order
       let rawResult: RawTextResult | null = null;

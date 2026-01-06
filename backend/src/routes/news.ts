@@ -111,12 +111,34 @@ router.put('/:id', authMiddleware, requirePermission('news'), async (req: AuthRe
   try {
     const { title, summary, content, categoryId, imageUrl, videoUrl, published } = req.body;
 
-    const slug = title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+    // First, get the current news to preserve existing values
+    const currentNews = await query('SELECT * FROM news WHERE id = $1', [req.params.id]);
+    
+    if (currentNews.rows.length === 0) {
+      return res.status(404).json({ error: 'Notícia não encontrada' });
+    }
+
+    const current = currentNews.rows[0];
+
+    // Use provided values or keep existing ones
+    const finalTitle = title !== undefined ? title : current.title;
+    const finalSummary = summary !== undefined ? summary : current.summary;
+    const finalContent = content !== undefined ? content : current.content;
+    const finalCategoryId = categoryId !== undefined ? categoryId : current.category_id;
+    const finalImageUrl = imageUrl !== undefined ? imageUrl : current.image_url;
+    const finalVideoUrl = videoUrl !== undefined ? videoUrl : current.video_url;
+    const finalPublished = published !== undefined ? published : current.published;
+
+    // Generate slug only if title is provided and different
+    let slug = current.slug;
+    if (title && title !== current.title) {
+      slug = title
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    }
 
     const result = await query(
       `UPDATE news 
@@ -124,12 +146,8 @@ router.put('/:id', authMiddleware, requirePermission('news'), async (req: AuthRe
            image_url = $6, video_url = $7, published = $8, updated_at = NOW()
        WHERE id = $9
        RETURNING *`,
-      [title, slug, summary, content, categoryId || null, imageUrl, videoUrl, published, req.params.id]
+      [finalTitle, slug, finalSummary, finalContent, finalCategoryId || null, finalImageUrl, finalVideoUrl, finalPublished, req.params.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Notícia não encontrada' });
-    }
 
     res.json(result.rows[0]);
   } catch (error) {

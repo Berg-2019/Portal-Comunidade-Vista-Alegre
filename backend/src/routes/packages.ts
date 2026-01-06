@@ -247,6 +247,7 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: 
           recipient_name: pkg.recipient,
           tracking_code: pkg.trackingCode,
           arrival_date: pkg.dateISO,
+          pickup_deadline: pkg.pickupDeadline || null,
           position: pkg.position,
           confidence: pkg.confidence,
           lineNumber: pkg.lineNumber
@@ -319,6 +320,8 @@ router.post('/upload-lista', authenticateToken, upload.single('pdf'), async (req
         position: pkg.position,
         date: pkg.date,
         dateISO: pkg.dateISO,
+        pickupDeadline: pkg.pickupDeadline || null,
+        pickupDeadlineStr: pkg.pickupDeadlineStr || null,
         confidence: pkg.confidence
       })),
       errors: parseResult.errors,
@@ -362,7 +365,8 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
         const recipientName = pkg.recipient_name || pkg.recipient;
         const trackingCode = pkg.tracking_code || pkg.trackingCode;
         const arrivalDateStr = pkg.arrival_date || pkg.dateISO;
-        const pickupDeadlineStr = pkg.pickup_deadline;
+        // Priorizar pickup_deadline do PDF (extraído automaticamente)
+        const pickupDeadlineStr = pkg.pickup_deadline || pkg.pickupDeadline;
         
         // Debug: log received dates
         console.log('📦 Package import - Datas recebidas:', {
@@ -407,16 +411,21 @@ router.post('/confirm-import', authenticateToken, async (req: Request, res: Resp
           continue;
         }
 
-        // Use arrival date from frontend or default to today
+        // Use arrival date from PDF/frontend or default to today
         const arrivalDate = arrivalDateStr ? new Date(arrivalDateStr + 'T12:00:00') : new Date();
         
-        // Use pickup deadline from frontend or calculate 7 days from arrival
+        // IMPORTANTE: Usar pickup deadline do PDF quando disponível (extraído automaticamente)
+        // Só calcular 7 dias se não vier do PDF
         let pickupDeadline: Date;
         if (pickupDeadlineStr) {
+          // Data extraída do PDF ou editada manualmente
           pickupDeadline = new Date(pickupDeadlineStr + 'T12:00:00');
+          console.log(`📅 Usando prazo do PDF/manual: ${pickupDeadlineStr}`);
         } else {
+          // Fallback: calcular 7 dias a partir da data de chegada
           pickupDeadline = new Date(arrivalDate);
           pickupDeadline.setDate(pickupDeadline.getDate() + 7);
+          console.log(`📅 Calculando prazo (7 dias): ${pickupDeadline.toISOString().split('T')[0]}`);
         }
 
         await query(

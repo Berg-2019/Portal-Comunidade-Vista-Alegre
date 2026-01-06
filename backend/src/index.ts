@@ -40,7 +40,7 @@ const generalLimiter = rateLimit({
 
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 20, // 20 uploads por hora
+  max: 50, // 50 uploads por hora (aumentado para suportar vídeos)
   message: { error: 'Limite de uploads atingido. Tente novamente em 1 hora.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -51,7 +51,8 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(generalLimiter);
 
 // Serve uploaded files statically

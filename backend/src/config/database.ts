@@ -63,12 +63,29 @@ export async function initDatabase() {
         filename VARCHAR(255) NOT NULL,
         original_name VARCHAR(255) NOT NULL,
         mimetype VARCHAR(100) NOT NULL,
-        size INTEGER NOT NULL,
+        size BIGINT NOT NULL,
         path VARCHAR(500) NOT NULL,
         category VARCHAR(50) DEFAULT 'general',
+        file_type VARCHAR(20) DEFAULT 'image',
         uploaded_by INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      -- Add file_type column if it doesn't exist (for existing databases)
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'uploaded_files' AND column_name = 'file_type') THEN
+          ALTER TABLE uploaded_files ADD COLUMN file_type VARCHAR(20) DEFAULT 'image';
+        END IF;
+      END $$;
+
+      -- Change size column to BIGINT if needed (for large video files)
+      DO $$ 
+      BEGIN 
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'uploaded_files' AND column_name = 'size' AND data_type = 'integer') THEN
+          ALTER TABLE uploaded_files ALTER COLUMN size TYPE BIGINT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS business_categories (
         id SERIAL PRIMARY KEY,

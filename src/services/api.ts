@@ -322,6 +322,13 @@ class ApiService {
     });
   }
 
+  async bulkGenerateCourtSlots(courtId: string, data: { day_of_week: number; start_hour: number; end_hour: number }) {
+    return this.request<{ success: boolean; slots: any[]; message: string }>(`/api/courts/${courtId}/slots/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async updateCourtSlot(slotId: string, available: boolean) {
     return this.request<{ success: boolean; slot: any }>(`/api/courts/slots/${slotId}`, {
       method: 'PUT',

@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Tag, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api";
+import MediaCarousel from "@/components/ui/MediaCarousel";
 
 interface News {
   id: number;
@@ -14,6 +15,7 @@ interface News {
   category_id: number;
   category_name?: string;
   image_url?: string;
+  video_url?: string;
   created_at: string;
 }
 
@@ -81,14 +83,13 @@ export default function NoticiaDetalhe() {
           Voltar para Notícias
         </Link>
 
-        {noticia.image_url && (
-          <div className="mb-8 rounded-xl overflow-hidden">
-            <img 
-              src={noticia.image_url} 
-              alt={noticia.title} 
-              className="w-full h-64 md:h-80 object-cover"
-            />
-          </div>
+        {(noticia.image_url || noticia.video_url) && (
+          <MediaCarousel
+            imageUrl={noticia.image_url}
+            videoUrl={noticia.video_url}
+            title={noticia.title}
+            className="mb-8"
+          />
         )}
 
         <header className="mb-8">

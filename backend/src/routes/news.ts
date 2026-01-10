@@ -79,24 +79,44 @@ router.get('/:id', async (req, res) => {
 // Create news (authenticated)
 router.post('/', authMiddleware, requirePermission('news'), async (req: AuthRequest, res) => {
   try {
-    const { title, summary, content, categoryId, imageUrl, videoUrl, published } = req.body;
+    // Accept both camelCase and snake_case for compatibility
+    const { title, summary, content, categoryId, category_id, imageUrl, image_url, videoUrl, video_url, published } = req.body;
+    const finalCategoryId = categoryId || category_id;
+    const finalImageUrl = imageUrl || image_url;
+    const finalVideoUrl = videoUrl || video_url;
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Título e conteúdo são obrigatórios' });
     }
 
-    const slug = title
+    // Generate base slug from title
+    let baseSlug = title
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
 
+    // Check if slug already exists and generate unique one if needed
+    let slug = baseSlug;
+    let counter = 1;
+    let slugExists = true;
+    
+    while (slugExists) {
+      const existing = await query('SELECT id FROM news WHERE slug = $1', [slug]);
+      if (existing.rows.length === 0) {
+        slugExists = false;
+      } else {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+    }
+
     const result = await query(
       `INSERT INTO news (title, slug, summary, content, category_id, image_url, video_url, published, author_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [title, slug, summary, content, categoryId || null, imageUrl, videoUrl, published || false, req.user?.id]
+      [title, slug, summary, content, finalCategoryId || null, finalImageUrl || null, finalVideoUrl || null, published || false, req.user?.id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -109,7 +129,8 @@ router.post('/', authMiddleware, requirePermission('news'), async (req: AuthRequ
 // Update news (authenticated)
 router.put('/:id', authMiddleware, requirePermission('news'), async (req: AuthRequest, res) => {
   try {
-    const { title, summary, content, categoryId, imageUrl, videoUrl, published } = req.body;
+    // Accept both camelCase and snake_case for compatibility
+    const { title, summary, content, categoryId, category_id, imageUrl, image_url, videoUrl, video_url, published } = req.body;
 
     // First, get the current news to preserve existing values
     const currentNews = await query('SELECT * FROM news WHERE id = $1', [req.params.id]);
@@ -120,13 +141,13 @@ router.put('/:id', authMiddleware, requirePermission('news'), async (req: AuthRe
 
     const current = currentNews.rows[0];
 
-    // Use provided values or keep existing ones
+    // Use provided values or keep existing ones (check both naming conventions)
     const finalTitle = title !== undefined ? title : current.title;
     const finalSummary = summary !== undefined ? summary : current.summary;
     const finalContent = content !== undefined ? content : current.content;
-    const finalCategoryId = categoryId !== undefined ? categoryId : current.category_id;
-    const finalImageUrl = imageUrl !== undefined ? imageUrl : current.image_url;
-    const finalVideoUrl = videoUrl !== undefined ? videoUrl : current.video_url;
+    const finalCategoryId = categoryId !== undefined ? categoryId : (category_id !== undefined ? category_id : current.category_id);
+    const finalImageUrl = imageUrl !== undefined ? imageUrl : (image_url !== undefined ? image_url : current.image_url);
+    const finalVideoUrl = videoUrl !== undefined ? videoUrl : (video_url !== undefined ? video_url : current.video_url);
     const finalPublished = published !== undefined ? published : current.published;
 
     // Generate slug only if title is provided and different

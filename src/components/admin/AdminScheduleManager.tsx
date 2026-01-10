@@ -35,8 +35,56 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/services/api";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Safe date formatting to prevent RangeError on invalid dates
+const formatDateSafe = (dateString: string, formatString: string) => {
+  try {
+    // Try parsing as ISO date first
+    const parsed = parseISO(dateString);
+    if (isValid(parsed)) {
+      return format(parsed, formatString, { locale: ptBR });
+    }
+    // Fallback: try direct Date construction
+    const date = new Date(dateString + 'T12:00:00');
+    if (isValid(date)) {
+      return format(date, formatString, { locale: ptBR });
+    }
+    return dateString; // Return original if invalid
+  } catch {
+    return dateString;
+  }
+};
+
+// Extract phone number from WhatsApp ID format (e.g., "108366688944156@lid" -> "108366688944156")
+// or clean up regular phone numbers
+const extractPhoneNumber = (phone: string) => {
+  if (!phone) return '';
+  // Remove @lid or @s.whatsapp.net suffix
+  let cleaned = phone.replace(/@(lid|s\.whatsapp\.net|c\.us)$/i, '');
+  // Keep only digits
+  cleaned = cleaned.replace(/\D/g, '');
+  // If number doesn't start with country code, assume Brazil (+55)
+  if (cleaned.length <= 11) {
+    cleaned = '55' + cleaned;
+  }
+  return cleaned;
+};
+
+// Format phone for display
+const formatPhoneDisplay = (phone: string) => {
+  const cleaned = extractPhoneNumber(phone);
+  if (cleaned.length >= 12) {
+    // Format: +55 (69) 99999-9999
+    const country = cleaned.slice(0, 2);
+    const ddd = cleaned.slice(2, 4);
+    const firstPart = cleaned.slice(4, 9);
+    const secondPart = cleaned.slice(9);
+    return `+${country} (${ddd}) ${firstPart}-${secondPart}`;
+  }
+  return phone;
+};
 
 interface Schedule {
   id: number;
@@ -470,7 +518,7 @@ export default function AdminScheduleManager() {
                 <div key={date} className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
                   <div className="bg-muted px-6 py-3">
                     <h3 className="font-heading font-semibold">
-                      {format(new Date(date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                      {formatDateSafe(date, "EEEE, dd 'de' MMMM")}
                     </h3>
                   </div>
                   <div className="divide-y divide-border">
@@ -505,10 +553,15 @@ export default function AdminScheduleManager() {
                                 <Clock className="h-4 w-4" />
                                 {reservation.start_time.slice(0, 5)} - {reservation.end_time.slice(0, 5)}
                               </p>
-                              <p className="flex items-center gap-2">
+                              <a
+                                href={`https://wa.me/${extractPhoneNumber(reservation.user_phone)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-primary hover:underline"
+                              >
                                 <Phone className="h-4 w-4" />
-                                {reservation.user_phone}
-                              </p>
+                                {formatPhoneDisplay(reservation.user_phone)}
+                              </a>
                               {reservation.notes && (
                                 <p className="text-xs italic mt-1">Obs: {reservation.notes}</p>
                               )}

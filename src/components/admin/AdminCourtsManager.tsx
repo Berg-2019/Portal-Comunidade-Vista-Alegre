@@ -9,6 +9,7 @@ import {
   Wrench,
   Loader2,
   AlertTriangle,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,7 @@ export default function AdminCourtsManager() {
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
   const [isCourtModalOpen, setIsCourtModalOpen] = useState(false);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [isBulkSlotModalOpen, setIsBulkSlotModalOpen] = useState(false);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -103,6 +105,11 @@ export default function AdminCourtsManager() {
     maintenance_reason: "",
     maintenance_start: "",
     maintenance_end: "",
+  });
+
+  const [bulkSlotForm, setBulkSlotForm] = useState({
+    startHour: 8,
+    endHour: 22,
   });
 
   useEffect(() => {
@@ -200,6 +207,40 @@ export default function AdminCourtsManager() {
       toast({
         title: "Erro",
         description: "Não foi possível adicionar o horário.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generateBulkSlots = async () => {
+    if (bulkSlotForm.startHour >= bulkSlotForm.endHour) {
+      toast({
+        title: "Erro",
+        description: "O horário de início deve ser menor que o de fim.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await api.bulkGenerateCourtSlots(selectedCourt, {
+        day_of_week: selectedDay,
+        start_hour: bulkSlotForm.startHour,
+        end_hour: bulkSlotForm.endHour,
+      });
+      toast({ 
+        title: "Horários gerados!",
+        description: result.message,
+      });
+      setIsBulkSlotModalOpen(false);
+      loadSlots(selectedCourt);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível gerar os horários.",
         variant: "destructive",
       });
     } finally {
@@ -431,6 +472,10 @@ export default function AdminCourtsManager() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button size="sm" variant="outline" onClick={() => setIsBulkSlotModalOpen(true)}>
+                <Zap className="h-4 w-4 mr-2" />
+                Gerar Horários
+              </Button>
               <Button size="sm" onClick={() => setIsSlotModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Horário
@@ -544,6 +589,100 @@ export default function AdminCourtsManager() {
             <Button onClick={addSlot} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Slot Generation Modal */}
+      <Dialog open={isBulkSlotModalOpen} onOpenChange={setIsBulkSlotModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Gerar Horários Automaticamente
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Quadra: <strong>{courts.find((c) => c.id.toString() === selectedCourt)?.name}</strong>
+              <br />
+              Dia: <strong>{DAYS_OF_WEEK[selectedDay]}</strong>
+            </p>
+
+            <p className="text-sm">
+              Defina o horário de início e fim, e o sistema criará automaticamente slots de 1 hora.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="bulkStartHour">Início (hora)</Label>
+                <Select
+                  value={bulkSlotForm.startHour.toString()}
+                  onValueChange={(value) =>
+                    setBulkSlotForm({ ...bulkSlotForm, startHour: parseInt(value) })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={i.toString()}>
+                        {i.toString().padStart(2, '0')}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bulkEndHour">Fim (hora)</Label>
+                <Select
+                  value={bulkSlotForm.endHour.toString()}
+                  onValueChange={(value) =>
+                    setBulkSlotForm({ ...bulkSlotForm, endHour: parseInt(value) })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={i.toString()}>
+                        {i.toString().padStart(2, '0')}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="p-3 bg-info/10 border border-info/20 rounded-lg">
+              <p className="text-xs text-info">
+                <strong>Serão criados {Math.max(0, bulkSlotForm.endHour - bulkSlotForm.startHour)} slots:</strong>
+                {' '}
+                {bulkSlotForm.startHour.toString().padStart(2, '0')}:00 - {bulkSlotForm.endHour.toString().padStart(2, '0')}:00
+              </p>
+            </div>
+
+            <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+                <p className="text-xs text-warning">
+                  Os horários existentes para este dia serão substituídos.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkSlotModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={generateBulkSlots} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Gerar Horários
             </Button>
           </DialogFooter>
         </DialogContent>

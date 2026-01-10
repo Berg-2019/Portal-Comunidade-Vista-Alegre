@@ -226,6 +226,56 @@ router.post('/:id/slots', authenticateToken, async (req: Request, res: Response)
   }
 });
 
+// Admin: Bulk generate time slots (1-hour intervals)
+router.post('/:id/slots/bulk', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { day_of_week, start_hour, end_hour } = req.body;
+
+    // Validate inputs
+    if (start_hour === undefined || end_hour === undefined || day_of_week === undefined) {
+      return res.status(400).json({ error: 'day_of_week, start_hour and end_hour are required' });
+    }
+
+    const startHour = parseInt(start_hour);
+    const endHour = parseInt(end_hour);
+
+    if (startHour >= endHour) {
+      return res.status(400).json({ error: 'start_hour must be less than end_hour' });
+    }
+
+    // Delete existing slots for this day
+    await query(
+      'DELETE FROM court_time_slots WHERE court_id = $1 AND day_of_week = $2',
+      [id, day_of_week]
+    );
+
+    // Generate 1-hour slots
+    const slots = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      const startTime = `${hour.toString().padStart(2, '0')}:00:00`;
+      const endTime = `${(hour + 1).toString().padStart(2, '0')}:00:00`;
+
+      const result = await query(
+        `INSERT INTO court_time_slots (court_id, day_of_week, start_time, end_time, available)
+         VALUES ($1, $2, $3, $4, true)
+         RETURNING *`,
+        [id, day_of_week, startTime, endTime]
+      );
+      slots.push(result.rows[0]);
+    }
+
+    res.json({ 
+      success: true, 
+      slots,
+      message: `${slots.length} horários criados com sucesso`
+    });
+  } catch (error) {
+    console.error('Error bulk generating slots:', error);
+    res.status(500).json({ error: 'Error generating slots' });
+  }
+});
+
 // Admin: Toggle slot availability
 router.put('/slots/:slotId', authenticateToken, async (req: Request, res: Response) => {
   try {

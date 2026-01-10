@@ -1,7 +1,17 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '@/services/api';
 
-export type SeasonalTheme = 'default' | 'christmas' | 'new_year' | 'easter' | 'carnaval';
+export type SeasonalTheme = 
+  | 'default' 
+  | 'christmas' 
+  | 'new_year' 
+  | 'easter' 
+  | 'carnaval'
+  | 'sao_joao'           // Festas Juninas
+  | 'independencia'      // 7 de Setembro
+  | 'tiradentes'         // 21 de Abril
+  | 'republica'          // 15 de Novembro
+  | 'rondonia';          // 4 de Janeiro - Aniversário de Rondônia
 
 export interface ThemeSchedule {
   theme: SeasonalTheme;
@@ -50,6 +60,11 @@ const defaultSchedules: ThemeSchedule[] = [
   { theme: 'new_year', startDate: '12-27', endDate: '01-02', enabled: true },
   { theme: 'easter', startDate: '03-20', endDate: '04-10', enabled: false },
   { theme: 'carnaval', startDate: '02-01', endDate: '02-15', enabled: false },
+  { theme: 'sao_joao', startDate: '06-01', endDate: '06-30', enabled: false },
+  { theme: 'independencia', startDate: '09-01', endDate: '09-10', enabled: false },
+  { theme: 'tiradentes', startDate: '04-18', endDate: '04-23', enabled: false },
+  { theme: 'republica', startDate: '11-13', endDate: '11-17', enabled: false },
+  { theme: 'rondonia', startDate: '01-01', endDate: '01-06', enabled: false },
 ];
 
 const SeasonalThemeContext = createContext<SeasonalThemeContextType | undefined>(undefined);
@@ -202,7 +217,12 @@ export function SeasonalThemeProvider({ children }: { children: ReactNode }) {
       'theme-christmas',
       'theme-new-year',
       'theme-easter',
-      'theme-carnaval'
+      'theme-carnaval',
+      'theme-sao-joao',
+      'theme-independencia',
+      'theme-tiradentes',
+      'theme-republica',
+      'theme-rondonia'
     );
 
     // Add current theme class (use activeTheme which considers scheduling)

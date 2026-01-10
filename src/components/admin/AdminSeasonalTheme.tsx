@@ -42,6 +42,36 @@ const themeColors: Record<SeasonalTheme, { primary: string; secondary: string; a
     accent: 'hsl(160, 80%, 45%)',
     bg: 'hsl(280, 30%, 97%)',
   },
+  sao_joao: {
+    primary: 'hsl(35, 85%, 45%)',      // Laranja quente
+    secondary: 'hsl(15, 75%, 50%)',    // Vermelho alaranjado
+    accent: 'hsl(50, 90%, 55%)',       // Amarelo milho
+    bg: 'hsl(30, 40%, 96%)',
+  },
+  independencia: {
+    primary: 'hsl(140, 60%, 40%)',     // Verde Brasil
+    secondary: 'hsl(50, 90%, 50%)',    // Amarelo Brasil
+    accent: 'hsl(220, 70%, 45%)',      // Azul Brasil
+    bg: 'hsl(140, 20%, 97%)',
+  },
+  tiradentes: {
+    primary: 'hsl(35, 50%, 45%)',      // Marrom histórico
+    secondary: 'hsl(45, 70%, 50%)',    // Dourado
+    accent: 'hsl(0, 60%, 45%)',        // Vermelho
+    bg: 'hsl(35, 25%, 95%)',
+  },
+  republica: {
+    primary: 'hsl(140, 50%, 35%)',     // Verde escuro
+    secondary: 'hsl(220, 60%, 40%)',   // Azul
+    accent: 'hsl(50, 85%, 50%)',       // Amarelo
+    bg: 'hsl(210, 20%, 97%)',
+  },
+  rondonia: {
+    primary: 'hsl(140, 55%, 35%)',     // Verde amazônico
+    secondary: 'hsl(45, 80%, 50%)',    // Amarelo
+    accent: 'hsl(200, 65%, 45%)',      // Azul rio
+    bg: 'hsl(145, 30%, 96%)',
+  },
 };
 
 const themeOptions: { value: SeasonalTheme; label: string; description: string; icon: string }[] = [
@@ -50,6 +80,11 @@ const themeOptions: { value: SeasonalTheme; label: string; description: string; 
   { value: 'new_year', label: 'Ano Novo', description: 'Fundo escuro com detalhes dourados', icon: '🎆' },
   { value: 'easter', label: 'Páscoa', description: 'Cores pastéis suaves e delicadas', icon: '🐰' },
   { value: 'carnaval', label: 'Carnaval', description: 'Cores vibrantes e alegres', icon: '🎭' },
+  { value: 'sao_joao', label: 'São João', description: 'Cores quentes de festa junina', icon: '🔥' },
+  { value: 'independencia', label: 'Independência', description: '7 de Setembro - Verde e amarelo', icon: '🇧🇷' },
+  { value: 'tiradentes', label: 'Tiradentes', description: '21 de Abril - Tons históricos', icon: '⚔️' },
+  { value: 'republica', label: 'República', description: '15 de Novembro - Cores nacionais', icon: '🏛️' },
+  { value: 'rondonia', label: 'Rondônia', description: '4 de Janeiro - Aniversário do estado', icon: '🌴' },
 ];
 
 const scheduleThemes = themeOptions.filter((t) => t.value !== 'default');

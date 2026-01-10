@@ -14,6 +14,9 @@ let cachedSettings: SiteSettings | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
+// Cache for bot phone number
+let cachedBotPhoneNumber: string | null = null;
+
 export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(cachedSettings || {});
   const [loading, setLoading] = useState(!cachedSettings);
@@ -29,8 +32,28 @@ export function useSettings() {
 
     const fetchSettings = async () => {
       try {
+        // Fetch settings from API
         const data = await api.getSettings();
         console.log('📋 Settings carregados:', data);
+        
+        // If no whatsapp_number in settings, try to get from bot
+        if (!data.whatsapp_number) {
+          try {
+            const botStatus = await api.getWhatsAppBotStatus();
+            if (botStatus?.phoneNumber) {
+              data.whatsapp_number = botStatus.phoneNumber;
+              cachedBotPhoneNumber = botStatus.phoneNumber;
+              console.log('📱 Número do bot detectado:', botStatus.phoneNumber);
+            }
+          } catch (botError) {
+            // Bot may not be connected, use cached number if available
+            if (cachedBotPhoneNumber) {
+              data.whatsapp_number = cachedBotPhoneNumber;
+            }
+            console.log('Bot não conectado, usando fallback');
+          }
+        }
+        
         cachedSettings = data;
         cacheTimestamp = Date.now();
         setSettings(data);
@@ -57,3 +80,4 @@ export function useSettings() {
 
   return { settings, loading, getWhatsAppLink };
 }
+

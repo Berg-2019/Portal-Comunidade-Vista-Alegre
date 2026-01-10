@@ -342,7 +342,11 @@ class ApiService {
     });
   }
 
-  // WhatsApp methods
+  // WhatsApp Bot methods
+  async getWhatsAppBotStatus(): Promise<{ connected: boolean; phoneNumber?: string; connectionMethod?: string }> {
+    return this.request<{ connected: boolean; phoneNumber?: string; connectionMethod?: string }>('/api/whatsapp-bot/status', { authenticated: false });
+  }
+
   async getWhatsAppGroups() {
     return this.request<any[]>('/api/whatsapp/groups', { authenticated: false });
   }

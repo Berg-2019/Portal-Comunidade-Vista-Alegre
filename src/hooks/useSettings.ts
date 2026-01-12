@@ -7,6 +7,9 @@ interface SiteSettings {
   whatsapp_number?: string;
   contact_email?: string;
   cover_image?: string;
+  logo_url?: string;
+  hero_title?: string;
+  hero_subtitle?: string;
 }
 
 // Cache com revalidação (5 minutos)

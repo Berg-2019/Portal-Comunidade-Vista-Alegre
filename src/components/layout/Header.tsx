@@ -3,6 +3,7 @@ import { Menu, X, Home, Newspaper, AlertTriangle, Store, Phone, Calendar, Packag
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/hooks/useSettings";
 
 const navItems = [
   { label: "Início", href: "/", icon: Home },
@@ -18,17 +19,26 @@ const navItems = [
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { settings } = useSettings();
 
   return (
     <header className="sticky top-0 z-50 w-full glass">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 min-w-0 flex-shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground flex-shrink-0">
-            <TreePine className="h-5 w-5" />
-          </div>
+          {settings.logo_url ? (
+            <img 
+              src={settings.logo_url} 
+              alt={settings.site_name || "Vista Alegre"} 
+              className="h-9 w-9 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground flex-shrink-0">
+              <TreePine className="h-5 w-5" />
+            </div>
+          )}
           <div className="hidden sm:block min-w-0">
             <span className="font-heading font-semibold text-base text-foreground block leading-tight truncate">
-              Vista Alegre
+              {settings.site_name || "Vista Alegre"}
             </span>
             <span className="text-[10px] text-muted-foreground truncate block">
               Portal Comunitário

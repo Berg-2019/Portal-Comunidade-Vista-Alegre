@@ -233,7 +233,7 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req: 
     
     // Use the robust parser
     const parser = new CorreiosPDFParser({
-      enableCache: true,
+      enableCache: false,  // Desabilitado para forçar reprocessamento
       enableLogging: true
     });
     
@@ -293,7 +293,7 @@ router.post('/upload-lista', authenticateToken, upload.single('pdf'), async (req
     console.log(`📄 Upload LDI: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
     
     const parser = new CorreiosPDFParser({
-      enableCache: true,
+      enableCache: false,  // Desabilitado para forçar reprocessamento
       enableLogging: true
     });
     

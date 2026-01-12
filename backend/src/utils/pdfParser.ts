@@ -116,7 +116,9 @@ export function cleanRecipientName(name: string): string {
   if (!name || typeof name !== 'string') return 'NOME NÃO IDENTIFICADO';
   
   let cleaned = name
-    // Remove address after ":" or "&"
+    // Remove caracteres especiais comuns (:|], |], [], :&, etc) - ANTES de outras limpezas
+    .replace(/[:\|\[\]\{\}&]+/g, ' ')
+    // Remove address after ":" or "&" that might be left
     .replace(/[:&].*$/, '')
     // Remove underscores (common in PDF forms)
     .replace(/_+/g, ' ')

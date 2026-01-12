@@ -341,12 +341,13 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 h-full w-64 bg-card border-r border-border transform transition-transform duration-200 lg:translate-x-0",
+          "fixed top-0 left-0 z-50 h-full w-64 bg-card border-r border-border transform transition-transform duration-200 lg:translate-x-0 flex flex-col",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="p-6 flex-shrink-0">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-heading font-bold">
                 VA
@@ -362,34 +363,36 @@ export default function AdminDashboard() {
               <X className="h-5 w-5" />
             </Button>
           </div>
-
-          <nav className="space-y-1">
-            {visibleNavItems.map((item, index) => (
-              <div key={item.id}>
-                {item.divider && (
-                  <div className="my-4 border-t border-border" />
-                )}
-                <button
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors",
-                    activeTab === item.id
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </button>
-              </div>
-            ))}
-          </nav>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border">
+        {/* Navigation - scrollable if needed */}
+        <nav className="flex-1 overflow-y-auto px-6 pb-4 space-y-1">
+          {visibleNavItems.map((item, index) => (
+            <div key={item.id}>
+              {item.divider && (
+                <div className="my-4 border-t border-border" />
+              )}
+              <button
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setSidebarOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors",
+                  activeTab === item.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </button>
+            </div>
+          ))}
+        </nav>
+
+        {/* Footer - always at bottom */}
+        <div className="flex-shrink-0 p-6 border-t border-border bg-card">
           {user && (
             <p className="text-xs text-muted-foreground mb-3 truncate">
               Logado como: {user.name}
@@ -502,9 +505,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Package List */}
+              {/* Package List - Desktop: Table, Mobile: Cards */}
               <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                <div className="overflow-x-auto">
+                
+                {/* Desktop Table (hidden on mobile) */}
+                <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
@@ -622,7 +627,160 @@ export default function AdminDashboard() {
                   </table>
                 </div>
 
-                {filteredPackages.length === 0 && (
+                {/* Mobile Cards (hidden on desktop) */}
+                <div className="lg:hidden">
+                  {loadingPackages ? (
+                    <div className="text-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {filteredPackages.map((pkg) => {
+                        const config = statusConfig[pkg.status] || statusConfig.aguardando;
+                        const Icon = config.icon;
+                        
+                        // Calculate remaining days
+                        const today = new Date();
+                        const deadline = new Date(pkg.pickup_deadline + 'T12:00:00');
+                        const diffTime = deadline.getTime() - today.getTime();
+                        const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        return (
+                          <div key={pkg.id} className={cn(
+                            "p-4 space-y-3",
+                            pkg.status === "aguardando" ? "bg-warning/5" : 
+                            pkg.status === "entregue" ? "bg-success/5" : "bg-destructive/5"
+                          )}>
+                            {/* Header: Icon + Name + Status */}
+                            <div className="flex items-start gap-3">
+                              <div className={cn(
+                                "p-2 rounded-full flex-shrink-0",
+                                pkg.status === "aguardando" ? "bg-warning/20" : 
+                                pkg.status === "entregue" ? "bg-success/20" : "bg-destructive/20"
+                              )}>
+                                <Icon className={cn(
+                                  "h-5 w-5",
+                                  pkg.status === "aguardando" ? "text-warning" : 
+                                  pkg.status === "entregue" ? "text-success" : "text-destructive"
+                                )} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className={cn(
+                                  "font-semibold truncate",
+                                  pkg.status === "aguardando" ? "text-warning" : 
+                                  pkg.status === "entregue" ? "text-success" : "text-destructive"
+                                )}>
+                                  {pkg.recipient_name}
+                                </h3>
+                                <p className="text-sm text-muted-foreground font-mono">
+                                  {pkg.tracking_code}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Dates Row */}
+                            <div className="flex items-center gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Chegada</span>
+                                <p className={cn(
+                                  "font-medium",
+                                  pkg.status === "aguardando" ? "text-warning" : "text-muted-foreground"
+                                )}>
+                                  {formatDateBR(pkg.arrival_date)}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Prazo</span>
+                                <p className={cn(
+                                  "font-medium",
+                                  pkg.status === "aguardando" ? "text-warning" : "text-muted-foreground"
+                                )}>
+                                  {formatDateBR(pkg.pickup_deadline)}
+                                </p>
+                              </div>
+                              {pkg.status === "aguardando" && (
+                                <div>
+                                  <span className="text-muted-foreground">Restam</span>
+                                  <p className={cn(
+                                    "font-bold",
+                                    diasRestantes <= 2 ? "text-destructive" : "text-warning"
+                                  )}>
+                                    {diasRestantes > 0 ? `${diasRestantes} dias` : "Vencido"}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Status Badge */}
+                            <span className={cn(
+                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
+                              config.class
+                            )}>
+                              <Icon className="h-3.5 w-3.5" />
+                              {config.label === "Aguardando" ? "Aguardando Retirada" : config.label}
+                            </span>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
+                              {pkg.status === "aguardando" && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-success border-success/30 hover:bg-success/10"
+                                    onClick={() => handleStatusChange(pkg.id, "entregue")}
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Entregar
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                                    onClick={() => handleStatusChange(pkg.id, "devolvido")}
+                                  >
+                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    Devolver
+                                  </Button>
+                                </>
+                              )}
+                              {pkg.status !== "aguardando" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleStatusChange(pkg.id, "aguardando")}
+                                >
+                                  <RotateCcw className="h-4 w-4 mr-1" />
+                                  Restaurar
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditModal(pkg)}
+                              >
+                                <Pencil className="h-4 w-4 mr-1" />
+                                Editar
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                onClick={() => openDeleteDialog(pkg.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Excluir
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {filteredPackages.length === 0 && !loadingPackages && (
                   <div className="text-center py-12">
                     <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Nenhuma encomenda encontrada</p>

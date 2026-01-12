@@ -100,16 +100,36 @@ export function AdminPackagePDFUpload({ open, onOpenChange, onImportSuccess }: A
       const result = await api.uploadPackagePdf(formData);
 
       if (result.success && result.results) {
-        // Usa as datas extraídas do PDF automaticamente
-        const packagesWithSelection = result.results.packages.map((pkg: any) => ({
-          recipient_name: pkg.recipient_name || pkg.recipient || '',
-          tracking_code: pkg.tracking_code || pkg.trackingCode || '',
-          // Usa a data de entrada extraída do PDF (dateISO ou arrival_date)
-          arrival_date: pkg.arrival_date || pkg.dateISO || format(new Date(), 'yyyy-MM-dd'),
-          // Usa o prazo de retirada extraído do PDF (pickupDeadline ou pickup_deadline)
-          pickup_deadline: pkg.pickup_deadline || pkg.pickupDeadline || '',
-          selected: true,
-        }));
+        // DEBUG: Log para verificar dados recebidos
+        console.log('📦 Dados recebidos do backend:', result.results.packages.slice(0, 3));
+        
+        // Encontrar uma data válida extraída de qualquer pacote para usar como fallback
+        // (toda a lista do PDF é do mesmo dia)
+        const packages = result.results.packages;
+        const fallbackDate = packages.find((pkg: any) => pkg.arrival_date || pkg.dateISO)?.arrival_date 
+                          || packages.find((pkg: any) => pkg.arrival_date || pkg.dateISO)?.dateISO
+                          || format(new Date(), 'yyyy-MM-dd');
+        
+        // Encontrar um prazo válido também
+        const fallbackDeadline = packages.find((pkg: any) => pkg.pickup_deadline || pkg.pickupDeadline)?.pickup_deadline
+                               || packages.find((pkg: any) => pkg.pickup_deadline || pkg.pickupDeadline)?.pickupDeadline
+                               || '';
+        
+        console.log('📅 Data de fallback encontrada:', fallbackDate, 'Prazo:', fallbackDeadline);
+        
+        // Usa as datas extraídas do PDF, com fallback para a data de outro pacote
+        const packagesWithSelection = packages.map((pkg: any) => {
+          const arrivalDate = pkg.arrival_date || pkg.dateISO || fallbackDate;
+          const pickupDeadline = pkg.pickup_deadline || pkg.pickupDeadline || fallbackDeadline;
+          
+          return {
+            recipient_name: pkg.recipient_name || pkg.recipient || '',
+            tracking_code: pkg.tracking_code || pkg.trackingCode || '',
+            arrival_date: arrivalDate,
+            pickup_deadline: pickupDeadline,
+            selected: true,
+          };
+        });
         setExtractedPackages(packagesWithSelection);
         setPdfFilename(result.results.filename || pdfFile.name);
 

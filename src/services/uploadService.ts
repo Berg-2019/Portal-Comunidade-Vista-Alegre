@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export type UploadCategory = 'news' | 'site' | 'courts' | 'general';
+export type UploadCategory = 'news' | 'site' | 'courts' | 'general' | 'businesses';
 export type FileType = 'image' | 'video';
 
 export interface UploadedFile {

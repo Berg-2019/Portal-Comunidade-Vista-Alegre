@@ -34,73 +34,133 @@ interface OccurrenceData {
 
 export class MessageTemplates {
   static mainMenu(): string {
-    return `🏡 *Portal Vista Alegre do Abunã*
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR');
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    
+    return `╭─〘 *BEM VINDO!* 〙
+│
+│ • Portal Vista Alegre
+│ • Data: ${dateStr}
+│ • Hora: ${timeStr}
+│
+╰━━━━━ 〔 🏠 〕 ━━━━━
 
-Olá! Como posso ajudar você hoje?
+╭─〘 *SERVIÇOS* 〙
+│
+│ *1.* ⚽ Reservar Quadra
+│ _Reserve horário nas quadras_
+│
+│ *2.* 🚨 Reportar Ocorrência
+│ _Informe problemas no distrito_
+│
+│ *3.* 📦 Consultar Encomendas
+│ _Verifique suas encomendas_
+│
+╰━━━━━ 〔 📋 〕 ━━━━━
 
-*1️⃣ Reservar Quadra*
-Reserve um horário nas quadras esportivas
+╭─〘 *INFORMAÇÕES* 〙
+│
+│ *4.* 📰 Últimas Notícias
+│ *5.* 📞 Contatos Úteis
+│ *6.* ℹ️ Sobre o Portal
+│
+╰━━━━━ 〔 ℹ️ 〕 ━━━━━
 
-*2️⃣ Reportar Ocorrência*
-Informe problemas no distrito
-
-*3️⃣ Consultar Encomendas*
-Verifique se há encomendas no seu nome
-
-━━━━━━━━━━━━━━━━━━
-Digite o *número* da opção desejada
-ou digite *menu* a qualquer momento`;
+_Digite o número da opção desejada_
+_ou "menu" a qualquer momento_`;
   }
 
   static courtSelection(courts: Court[]): string {
     if (courts.length === 0) {
-      return '😔 Nenhuma quadra disponível no momento.\n\nDigite *menu* para voltar.';
+      return `╭─〘 *QUADRAS* 〙
+│
+│ 😔 Nenhuma quadra disponível
+│ no momento.
+│
+╰━━━━━ 〔 ⚽ 〕 ━━━━━
+
+_Digite "menu" para voltar_`;
     }
 
-    let message = `⚽ *RESERVA DE QUADRAS*\n\nEscolha a quadra:\n\n`;
+    let message = `╭─〘 *RESERVA DE QUADRAS* 〙
+│
+│ Escolha a quadra:
+│\n`;
     
     courts.forEach((court, index) => {
-      message += `*${index + 1}.* ${court.name}\n`;
+      message += `│ *${index + 1}.* ⚽ ${court.name}\n`;
       if (court.description) {
-        message += `   _${court.description}_\n`;
+        message += `│    _${court.description}_\n`;
       }
     });
 
-    message += `\n━━━━━━━━━━━━━━━━━━\nDigite o *número* da quadra\nou *0* para cancelar`;
+    message += `│
+╰━━━━━ 〔 ⚽ 〕 ━━━━━
+
+_Digite o número da quadra_
+_ou "0" para cancelar_`;
     
     return message;
   }
 
-  static dateSelection(): string {
+  static dateSelection(availableDates?: Array<{date: Date; dayIndex: number}>): string {
     const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const today = new Date();
     
-    let message = `📅 *ESCOLHA A DATA*\n\n`;
+    let message = `╭─〘 *ESCOLHA A DATA* 〙
+│\n`;
     
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const day = date.getDate().toString().padStart(2, '0');
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const dayName = days[date.getDay()];
-      const label = i === 0 ? '(Hoje)' : i === 1 ? '(Amanhã)' : '';
-      
-      message += `*${i + 1}.* ${dayName}, ${day}/${month} ${label}\n`;
+    if (availableDates && availableDates.length > 0) {
+      // Mostrar apenas datas com horários disponíveis
+      availableDates.forEach((item, index) => {
+        const day = item.date.getDate().toString().padStart(2, '0');
+        const month = (item.date.getMonth() + 1).toString().padStart(2, '0');
+        const dayName = days[item.date.getDay()];
+        const isToday = item.dayIndex === 0;
+        const isTomorrow = item.dayIndex === 1;
+        const label = isToday ? '_(Hoje)_' : isTomorrow ? '_(Amanhã)_' : '';
+        
+        message += `│ *${index + 1}.* 📅 ${dayName}, ${day}/${month} ${label}\n`;
+      });
+    } else {
+      // Fallback: mostrar próximos 7 dias
+      const today = new Date();
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const dayName = days[date.getDay()];
+        const label = i === 0 ? '_(Hoje)_' : i === 1 ? '_(Amanhã)_' : '';
+        
+        message += `│ *${i + 1}.* 📅 ${dayName}, ${day}/${month} ${label}\n`;
+      }
     }
 
-    message += `\n━━━━━━━━━━━━━━━━━━\nDigite o *número* do dia\nou *0* para cancelar`;
+    message += `│
+╰━━━━━ 〔 📅 〕 ━━━━━
+
+_Digite o número do dia_
+_ou "0" para cancelar_`;
     
     return message;
   }
 
   static timeSelection(slots: TimeSlot[], date: string): string {
-    let message = `⏰ *HORÁRIOS DISPONÍVEIS*\n📅 ${date}\n\n`;
+    let message = `╭─〘 *HORÁRIOS DISPONÍVEIS* 〙
+│
+│ 📅 ${date}
+│\n`;
     
     slots.forEach((slot, index) => {
-      message += `*${index + 1}.* ${slot.start_time} - ${slot.end_time}\n`;
+      message += `│ *${index + 1}.* ⏰ ${slot.start_time} - ${slot.end_time}\n`;
     });
 
-    message += `\n━━━━━━━━━━━━━━━━━━\nDigite o *número* do horário\nou *0* para cancelar`;
+    message += `│
+╰━━━━━ 〔 ⏰ 〕 ━━━━━
+
+_Digite o número do horário_
+_ou "0" para cancelar_`;
     
     return message;
   }

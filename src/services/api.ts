@@ -163,6 +163,13 @@ class ApiService {
     });
   }
 
+  async createBusiness(data: any) {
+    return this.request<{ success: boolean; business: any }>('/api/businesses/admin/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async updateBusiness(id: string, data: FormData | any) {
     const isFormData = data instanceof FormData;
     return this.request<{ success: boolean; business: any }>(`/api/businesses/admin/${id}`, {

@@ -79,15 +79,66 @@ export class CourtHandler {
 
     const selectedCourt = this.courts[courtIndex];
     
+    // Buscar datas com horários disponíveis
+    const availableDates = await this.getAvailableDates(selectedCourt.id);
+    
+    if (availableDates.length === 0) {
+      await sock.sendMessage(jid, { 
+        text: `╭─〘 *SEM DISPONIBILIDADE* 〙
+│
+│ 😔 Não há horários disponíveis
+│ para ${selectedCourt.name}
+│ nos próximos 7 dias.
+│
+╰━━━━━ 〔 ⚽ 〕 ━━━━━
+
+_Digite "menu" para voltar_` 
+      });
+      sessionManager.clearSession(jid);
+      return;
+    }
+    
     sessionManager.updateSession(jid, {
       ...session,
       step: 'select_date',
-      data: { ...session.data, courtId: selectedCourt.id, courtName: selectedCourt.name }
+      data: { 
+        ...session.data, 
+        courtId: selectedCourt.id, 
+        courtName: selectedCourt.name,
+        availableDates 
+      }
     });
 
     await sock.sendMessage(jid, { 
-      text: MessageTemplates.dateSelection() 
+      text: MessageTemplates.dateSelection(availableDates) 
     });
+  }
+
+  private async getAvailableDates(courtId: number): Promise<Array<{date: Date; dayIndex: number}>> {
+    const availableDates: Array<{date: Date; dayIndex: number}> = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      const dayOfWeek = date.getDay();
+      
+      try {
+        const response = await this.apiClient.get(
+          `/api/courts/${courtId}/slots?day_of_week=${dayOfWeek}`
+        );
+        
+        const slots = response.data.slots?.filter((s: TimeSlot) => s.available !== false) || [];
+        
+        if (slots.length > 0) {
+          availableDates.push({ date, dayIndex: i });
+        }
+      } catch (error) {
+        console.error(`Erro ao buscar slots para dia ${dayOfWeek}:`, error);
+      }
+    }
+    
+    return availableDates;
   }
 
   private async handleDateSelection(
@@ -97,17 +148,18 @@ export class CourtHandler {
     sock: WASocket,
     sessionManager: SessionManager
   ): Promise<void> {
-    const dayIndex = parseInt(text) - 1;
-    const dates = this.getNextDays(7);
+    const selectionIndex = parseInt(text) - 1;
+    const availableDates: Array<{date: Date; dayIndex: number}> = session.data.availableDates || [];
     
-    if (isNaN(dayIndex) || dayIndex < 0 || dayIndex >= dates.length) {
+    if (isNaN(selectionIndex) || selectionIndex < 0 || selectionIndex >= availableDates.length) {
       await sock.sendMessage(jid, { 
         text: '❌ Opção inválida. Por favor, escolha um número da lista.' 
       });
       return;
     }
 
-    const selectedDate = dates[dayIndex];
+    const selectedDateInfo = availableDates[selectionIndex];
+    const selectedDate = new Date(selectedDateInfo.date);
     const dayOfWeek = selectedDate.getDay();
 
     try {
@@ -119,8 +171,14 @@ export class CourtHandler {
       
       if (slots.length === 0) {
         await sock.sendMessage(jid, { 
-          text: '😔 Não há horários disponíveis para esta data. Escolha outra data:\n\n' + 
-                MessageTemplates.dateSelection() 
+          text: `╭─〘 *SEM HORÁRIOS* 〙
+│
+│ 😔 Não há mais horários
+│ disponíveis para esta data.
+│
+╰━━━━━ 〔 📅 〕 ━━━━━
+
+_Escolha outra data ou digite "menu"_` 
         });
         return;
       }

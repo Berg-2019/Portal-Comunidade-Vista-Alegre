@@ -48,7 +48,13 @@ app.get('/api/bot/status', (req, res) => {
 // Connect bot via QR Code (método tradicional)
 app.post('/api/bot/connect', async (req, res) => {
   try {
-    await bot.connectWithQR(messageHandler.handleMessage.bind(messageHandler));
+    const sock = await bot.connectWithQR(messageHandler.handleMessage.bind(messageHandler));
+    
+    // Start reminder service when connected
+    const reminderService = messageHandler.getReminderService();
+    reminderService.setSocket(sock);
+    reminderService.start();
+    
     res.json({ success: true, message: 'Iniciando conexão via QR Code...' });
   } catch (error: any) {
     console.error('Erro ao conectar bot via QR:', error);
@@ -81,7 +87,13 @@ app.post('/api/bot/connect-pairing', async (req, res) => {
       });
     }
 
-    await bot.connectWithPairingCode(cleanNumber, messageHandler.handleMessage.bind(messageHandler));
+    const sock = await bot.connectWithPairingCode(cleanNumber, messageHandler.handleMessage.bind(messageHandler));
+    
+    // Start reminder service when connected
+    const reminderService = messageHandler.getReminderService();
+    reminderService.setSocket(sock);
+    reminderService.start();
+    
     res.json({ success: true, message: 'Solicitando código de pareamento...' });
   } catch (error: any) {
     console.error('Erro ao conectar bot via Pairing Code:', error);
@@ -109,6 +121,10 @@ app.get('/api/bot/pairing-code', (req, res) => {
 // Disconnect bot
 app.post('/api/bot/disconnect', async (req, res) => {
   try {
+    // Stop reminder service before disconnecting
+    const reminderService = messageHandler.getReminderService();
+    reminderService.stop();
+    
     await bot.disconnect();
     res.json({ success: true, message: 'Bot desconectado' });
   } catch (error: any) {

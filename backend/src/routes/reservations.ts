@@ -213,4 +213,76 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// GET upcoming reservations that need reminder (for bot)
+router.get('/upcoming-reminders', async (req: Request, res: Response) => {
+  try {
+    // Get reservations for today that are confirmed, 
+    // haven't had reminder sent, and start within the next 15 minutes
+    const result = await query(`
+      SELECT r.*, c.name as court_name
+      FROM court_reservations r
+      JOIN courts c ON r.court_id = c.id
+      WHERE r.reservation_date = CURRENT_DATE
+        AND r.status = 'confirmed'
+        AND r.reminder_sent = false
+        AND r.start_time <= (CURRENT_TIME + INTERVAL '15 minutes')
+        AND r.start_time > CURRENT_TIME
+      ORDER BY r.start_time
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching upcoming reminders:', error);
+    res.status(500).json({ error: 'Erro ao buscar lembretes' });
+  }
+});
+
+// PUT mark reminder as sent
+router.put('/:id/reminder-sent', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await query(
+      `UPDATE court_reservations 
+       SET reminder_sent = true, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Reserva não encontrada' });
+    }
+
+    res.json({ success: true, reservation: result.rows[0] });
+  } catch (error) {
+    console.error('Error marking reminder as sent:', error);
+    res.status(500).json({ error: 'Erro ao atualizar lembrete' });
+  }
+});
+
+// PUT confirm reservation (from reminder response)
+router.put('/:id/confirm', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await query(
+      `UPDATE court_reservations 
+       SET status = 'confirmed', notes = COALESCE(notes, '') || ' [Presença confirmada via WhatsApp]', updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Reserva não encontrada' });
+    }
+
+    res.json({ success: true, reservation: result.rows[0] });
+  } catch (error) {
+    console.error('Error confirming reservation:', error);
+    res.status(500).json({ error: 'Erro ao confirmar reserva' });
+  }
+});
+
 export default router;

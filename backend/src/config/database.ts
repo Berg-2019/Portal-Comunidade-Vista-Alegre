@@ -332,9 +332,18 @@ export async function initDatabase() {
         status VARCHAR(20) DEFAULT 'confirmed',
         source VARCHAR(20) DEFAULT 'whatsapp',
         notes TEXT,
+        reminder_sent BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
+
+      -- Add reminder_sent column if it doesn't exist (for existing databases)
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'court_reservations' AND column_name = 'reminder_sent') THEN
+          ALTER TABLE court_reservations ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE;
+        END IF;
+      END $$;
 
       -- PDF cache table for processed results
       CREATE TABLE IF NOT EXISTS pdf_cache (

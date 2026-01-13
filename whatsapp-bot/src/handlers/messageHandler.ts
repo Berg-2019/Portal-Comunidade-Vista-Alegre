@@ -4,6 +4,7 @@ import { OccurrenceHandler } from './occurrenceHandler';
 import { PackageHandler } from './packageHandler';
 import { ApiClient } from '../services/apiClient';
 import { SessionManager, UserSession } from '../services/sessionManager';
+import { ReminderService } from '../services/reminderService';
 import { MessageTemplates } from '../utils/messageTemplates';
 
 export class MessageHandler {
@@ -12,6 +13,7 @@ export class MessageHandler {
   private courtHandler: CourtHandler;
   private occurrenceHandler: OccurrenceHandler;
   private packageHandler: PackageHandler;
+  private reminderService: ReminderService;
 
   constructor(apiUrl: string) {
     this.apiClient = new ApiClient(apiUrl);
@@ -19,6 +21,11 @@ export class MessageHandler {
     this.courtHandler = new CourtHandler(this.apiClient);
     this.occurrenceHandler = new OccurrenceHandler(this.apiClient);
     this.packageHandler = new PackageHandler(this.apiClient);
+    this.reminderService = new ReminderService(this.apiClient);
+  }
+
+  getReminderService(): ReminderService {
+    return this.reminderService;
   }
 
   async handleMessage(msg: proto.IWebMessageInfo, sock: WASocket): Promise<void> {
@@ -35,6 +42,15 @@ export class MessageHandler {
     console.log(`📩 Mensagem de ${jid}: ${text}`);
 
     try {
+      // Check for pending reminder response first
+      if (this.reminderService.hasPendingReminder(jid)) {
+        const response = await this.reminderService.handleReminderResponse(jid, normalizedText);
+        if (response) {
+          await sock.sendMessage(jid, { text: response });
+          return;
+        }
+      }
+
       // Check if user is in a flow
       if (session?.currentFlow) {
         await this.handleFlowMessage(jid, normalizedText, session, sock);

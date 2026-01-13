@@ -43,7 +43,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// Public: Get time slots for a court
+// Public: Get time slots for a court (excluding fixed schedules)
 router.get('/:id/slots', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -61,6 +61,42 @@ router.get('/:id/slots', async (req: Request, res: Response) => {
 
     const slotsResult = await query(queryText, params);
     
+    // Buscar horários fixos ativos para esta quadra/dia
+    let fixedSchedulesQuery = `
+      SELECT start_time, end_time, day_of_week 
+      FROM fixed_schedules 
+      WHERE court_id = $1 AND active = true
+    `;
+    const fixedParams: any[] = [id];
+    
+    if (day_of_week !== undefined) {
+      fixedSchedulesQuery += ' AND day_of_week = $2';
+      fixedParams.push(day_of_week);
+    }
+    
+    const fixedResult = await query(fixedSchedulesQuery, fixedParams);
+    const fixedSchedules = fixedResult.rows;
+    
+    // Filtrar slots que conflitam com horários fixos
+    const availableSlots = slotsResult.rows.filter((slot: any) => {
+      // Verificar se o slot conflita com algum horário fixo
+      const hasConflict = fixedSchedules.some((fixed: any) => {
+        // Mesmo dia da semana
+        if (fixed.day_of_week !== slot.day_of_week) return false;
+        
+        // Verificar sobreposição de horários
+        const slotStart = slot.start_time;
+        const slotEnd = slot.end_time;
+        const fixedStart = fixed.start_time;
+        const fixedEnd = fixed.end_time;
+        
+        // Conflito se: slotStart < fixedEnd AND slotEnd > fixedStart
+        return slotStart < fixedEnd && slotEnd > fixedStart;
+      });
+      
+      return !hasConflict && slot.available !== false;
+    });
+    
     // Buscar períodos de manutenção ativos
     const maintenanceResult = await query(
       `SELECT * FROM court_maintenance_periods 
@@ -71,7 +107,7 @@ router.get('/:id/slots', async (req: Request, res: Response) => {
 
     // Retornar no formato esperado pelo frontend
     res.json({
-      slots: slotsResult.rows,
+      slots: availableSlots,
       maintenancePeriods: maintenanceResult.rows
     });
   } catch (error) {

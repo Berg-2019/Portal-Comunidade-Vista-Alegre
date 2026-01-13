@@ -14,7 +14,7 @@ import { query } from "../config/database";
 const router = Router();
 
 // Ensure upload directories exist
-const categories = ["news", "site", "courts", "general"];
+const categories = ["news", "site", "courts", "general", "businesses"];
 categories.forEach((category) => {
   // Diretórios para imagens
   const imageDir = path.join(__dirname, "../../uploads", category);

@@ -200,6 +200,22 @@ export default function AdminBusinessManager() {
           is_sponsor: formData.is_sponsor,
         });
         toast({ title: "Comércio atualizado com sucesso!" });
+      } else {
+        await api.createBusiness({
+          name: formData.name,
+          description: formData.description,
+          category_id: formData.category_id,
+          address: formData.address,
+          phone: formData.phone,
+          whatsapp: formData.whatsapp,
+          instagram_url: formData.instagram_url,
+          website_url: formData.website_url,
+          location: formData.location,
+          opening_hours: formData.opening_hours,
+          image_url: formData.image_url,
+          is_sponsor: formData.is_sponsor,
+        });
+        toast({ title: "Comércio criado com sucesso!" });
       }
       
       setIsModalOpen(false);
@@ -519,7 +535,7 @@ export default function AdminBusinessManager() {
               <ImageUpload
                 value={formData.image_url}
                 onChange={(url) => setFormData({ ...formData, image_url: url })}
-                category="general"
+                category="businesses"
                 aspectRatio="video"
                 recommendedSize="800x450px"
               />

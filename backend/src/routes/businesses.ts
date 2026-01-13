@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
 import { authenticateToken } from '../middleware/auth';
-import { uploadSingle } from '../middleware/upload';
+import { uploadSingle, uploadBusinessSingle } from '../middleware/upload';
 
 const router = Router();
 
 // Public: Submit business for approval (no auth required)
-router.post('/register', uploadSingle('image'), async (req: Request, res: Response) => {
+router.post('/register', uploadBusinessSingle('image'), async (req: Request, res: Response) => {
   try {
     const {
       name,
@@ -125,6 +125,54 @@ router.get('/admin/pending-count', authenticateToken, async (req: Request, res: 
   }
 });
 
+// Admin: Create business (auto-approved)
+router.post('/admin/create', authenticateToken, uploadBusinessSingle('image'), async (req: Request, res: Response) => {
+  try {
+    const {
+      name,
+      description,
+      category_id,
+      address,
+      location,
+      phone,
+      whatsapp,
+      instagram_url,
+      website_url,
+      opening_hours,
+      is_sponsor,
+    } = req.body;
+
+    if (!name || !description || !category_id) {
+      return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+    }
+
+    const imageUrl = req.file ? `/uploads/businesses/${req.file.filename}` : req.body.image_url || null;
+
+    const result = await query(
+      `INSERT INTO businesses (
+        name, description, category_id, address, location, phone, whatsapp,
+        instagram_url, website_url, opening_hours, image_url, status, is_sponsor
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'approved', $12)
+      RETURNING *`,
+      [
+        name, description, category_id, address, location, phone, whatsapp,
+        instagram_url, website_url, opening_hours, imageUrl, is_sponsor === 'true' || is_sponsor === true
+      ]
+    );
+
+    console.log(`✅ Admin created business: ${name}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Comércio criado com sucesso',
+      business: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Error creating business:', error);
+    res.status(500).json({ error: 'Erro ao criar comércio' });
+  }
+});
+
 // Admin: Approve business
 router.put('/admin/:id/approve', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -168,7 +216,7 @@ router.put('/admin/:id/reject', authenticateToken, async (req: Request, res: Res
 });
 
 // Admin: Update business
-router.put('/admin/:id', authenticateToken, uploadSingle('image'), async (req: Request, res: Response) => {
+router.put('/admin/:id', authenticateToken, uploadBusinessSingle('image'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {

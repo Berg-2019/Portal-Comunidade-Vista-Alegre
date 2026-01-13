@@ -128,6 +128,31 @@ export const uploadSingle = (fieldName: string) => upload.single(fieldName);
 export const uploadVideoSingle = (fieldName: string) => uploadVideo.single(fieldName);
 export const uploadMediaSingle = (fieldName: string) => uploadMedia.single(fieldName);
 
+// Storage específico para businesses (sempre salva em 'businesses' folder)
+const businessStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../../uploads/businesses');
+    ensureDirectoryExists(uploadPath);
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const uniqueId = uuidv4().split('-')[0];
+    const ext = path.extname(file.originalname);
+    cb(null, `${timestamp}-${uniqueId}${ext}`);
+  },
+});
+
+const businessUpload = multer({
+  storage: businessStorage,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: MAX_IMAGE_SIZE,
+  },
+});
+
+export const uploadBusinessSingle = (fieldName: string) => businessUpload.single(fieldName);
+
 // Handler de erros para upload de imagens
 export const uploadErrorHandler = (err: any, req: any, res: any, next: any) => {
   if (err instanceof multer.MulterError) {

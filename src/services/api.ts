@@ -53,10 +53,10 @@ class ApiService {
       body: JSON.stringify({ email, password }),
       authenticated: false,
     });
-    
+
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('auth_user', JSON.stringify(data.user));
-    
+
     return data;
   }
 
@@ -185,8 +185,8 @@ class ApiService {
   }
 
   // Package methods
-  async getPackages(params?: { 
-    search?: string; 
+  async getPackages(params?: {
+    search?: string;
     status?: string;
     page?: number;
     limit?: number;
@@ -240,8 +240,8 @@ class ApiService {
     });
   }
 
-  async updatePackage(id: string, data: { 
-    status?: string; 
+  async updatePackage(id: string, data: {
+    status?: string;
     notes?: string;
     recipient_name?: string;
     tracking_code?: string;
@@ -658,6 +658,108 @@ class ApiService {
   async deleteReservation(id: string) {
     return this.request<{ success: boolean }>(`/api/reservations/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Diary (Diário de Obras) methods
+  async getDiarios(params?: { data_inicio?: string; data_fim?: string; tipo?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.data_inicio) queryParams.append('data_inicio', params.data_inicio);
+    if (params?.data_fim) queryParams.append('data_fim', params.data_fim);
+    if (params?.tipo) queryParams.append('tipo', params.tipo);
+    const queryString = queryParams.toString();
+    return this.request<any[]>(`/api/diary${queryString ? `?${queryString}` : ''}`, {
+      authenticated: false,
+    });
+  }
+
+  async getDiario(id: string | number) {
+    return this.request<any>(`/api/diary/${id}`, { authenticated: false });
+  }
+
+  async getTiposAtividade() {
+    return this.request<any[]>('/api/diary/tipos/atividades', { authenticated: false });
+  }
+
+  async getDiarioStats() {
+    return this.request<any>('/api/diary/admin/stats');
+  }
+
+  async createDiario(data: { data: string; observacoes?: string; tempo?: any[] }) {
+    return this.request<{ success: boolean; diary: any }>('/api/diary', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateDiario(id: string | number, data: { observacoes?: string; tempo?: any[] }) {
+    return this.request<{ success: boolean; diary: any }>(`/api/diary/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteDiario(id: string | number) {
+    return this.request<{ success: boolean }>(`/api/diary/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createAtividade(diarioId: string | number, data: {
+    descricao: string;
+    local: string;
+    tipo: string;
+    status?: string;
+    observacoes?: string;
+    ordem?: number;
+  }) {
+    return this.request<{ success: boolean; activity: any }>(`/api/diary/${diarioId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAtividade(diarioId: string | number, id: string | number, data: {
+    descricao?: string;
+    local?: string;
+    tipo?: string;
+    status?: string;
+    observacoes?: string;
+    ordem?: number;
+  }) {
+    return this.request<{ success: boolean; activity: any }>(`/api/diary/${diarioId}/activities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAtividade(diarioId: string | number, id: string | number) {
+    return this.request<{ success: boolean }>(`/api/diary/${diarioId}/activities/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async contestAtividade(atividadeId: string | number, data: {
+    nome_morador: string;
+    contato?: string;
+    mensagem: string;
+  }) {
+    return this.request<{ success: boolean; message: string; contest: any }>(`/api/diary/activities/${atividadeId}/contest`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      authenticated: false,
+    });
+  }
+
+  async getContests(status?: string) {
+    const queryString = status ? `?status=${status}` : '';
+    return this.request<any[]>(`/api/diary/admin/contests${queryString}`);
+  }
+
+  async updateContest(id: string | number, data: { status?: string; resposta_admin?: string }) {
+    return this.request<{ success: boolean; contest: any }>(`/api/diary/admin/contests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 }

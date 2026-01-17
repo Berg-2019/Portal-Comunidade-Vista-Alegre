@@ -17,6 +17,7 @@ import usersRoutes from './routes/users';
 import contactsRoutes from './routes/contacts';
 import schedulesRoutes from './routes/schedules';
 import reservationsRoutes from './routes/reservations';
+import diaryRoutes from './routes/diary';
 import { initDatabase } from './config/database';
 
 dotenv.config();
@@ -72,6 +73,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/contacts', contactsRoutes);
 app.use('/api/schedules', schedulesRoutes);
 app.use('/api/reservations', reservationsRoutes);
+app.use('/api/diary', diaryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

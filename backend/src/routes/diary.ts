@@ -257,7 +257,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 router.post('/:id/activities', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { descricao, local, tipo, status, observacoes, ordem } = req.body;
+        const { descricao, local, tipo, status, observacoes, ordem, image_url, video_url, latitude, longitude } = req.body;
 
         // Validate
         if (!descricao || descricao.trim().length < 5) {
@@ -277,9 +277,9 @@ router.post('/:id/activities', authenticateToken, async (req, res) => {
         }
 
         const result = await query(
-            `INSERT INTO atividades_obra (diario_id, descricao, local, tipo, status, observacoes, ordem)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-            [id, descricao.trim(), local.trim(), tipo, status || 'em_andamento', observacoes?.trim() || null, ordem || 0]
+            `INSERT INTO atividades_obra (diario_id, descricao, local, tipo, status, observacoes, ordem, image_url, video_url, latitude, longitude)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            [id, descricao.trim(), local.trim(), tipo, status || 'em_andamento', observacoes?.trim() || null, ordem || 0, image_url || null, video_url || null, latitude || null, longitude || null]
         );
 
         console.log(`📝 Activity added to diary ${id}`);
@@ -294,7 +294,7 @@ router.post('/:id/activities', authenticateToken, async (req, res) => {
 router.put('/:diaryId/activities/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { descricao, local, tipo, status, observacoes, ordem } = req.body;
+        const { descricao, local, tipo, status, observacoes, ordem, image_url, video_url, latitude, longitude } = req.body;
 
         const result = await query(
             `UPDATE atividades_obra SET 
@@ -304,9 +304,13 @@ router.put('/:diaryId/activities/:id', authenticateToken, async (req, res) => {
         status = COALESCE($4, status),
         observacoes = COALESCE($5, observacoes),
         ordem = COALESCE($6, ordem),
+        image_url = COALESCE($7, image_url),
+        video_url = COALESCE($8, video_url),
+        latitude = COALESCE($9, latitude),
+        longitude = COALESCE($10, longitude),
         updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
-            [descricao?.trim(), local?.trim(), tipo, status, observacoes?.trim(), ordem, id]
+       WHERE id = $11 RETURNING *`,
+            [descricao?.trim(), local?.trim(), tipo, status, observacoes?.trim(), ordem, image_url, video_url, latitude, longitude, id]
         );
 
         if (result.rows.length === 0) {

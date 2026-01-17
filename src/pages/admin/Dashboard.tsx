@@ -27,6 +27,7 @@ import {
   Palette,
   Pencil,
   Trash2,
+  HardHat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,12 +71,13 @@ import AdminWhatsAppManager from "@/components/admin/AdminWhatsAppManager";
 import { AdminBotManager } from "@/components/admin/AdminBotManager";
 import { AdminPackagePDFUpload } from "@/components/admin/AdminPackagePDFUpload";
 import { AdminColorEditor } from "@/components/admin/AdminColorEditor";
+import AdminDiarioManager from "@/components/admin/AdminDiarioManager";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/services/api";
 import { formatDateBR, formatDateISO } from "@/lib/dateUtils";
 
 type PackageStatus = "aguardando" | "entregue" | "devolvido";
-type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios" | "cores";
+type ActiveTab = "encomendas" | "noticias" | "quadras" | "agendamentos" | "ocorrencias" | "comercios" | "whatsapp" | "bot" | "pagina" | "usuarios" | "cores" | "diario";
 
 interface PackageItem {
   id: string | number;
@@ -106,11 +108,13 @@ const tabPermissions: Record<ActiveTab, string | null> = {
   pagina: "pagina",
   cores: "pagina",
   usuarios: "usuarios",
+  diario: "ocorrencias",
 };
 
 const navItems = [
   { id: "encomendas" as ActiveTab, label: "Encomendas", icon: Package },
   { id: "noticias" as ActiveTab, label: "Notícias", icon: Newspaper },
+  { id: "diario" as ActiveTab, label: "Diário de Obras", icon: HardHat },
   { id: "ocorrencias" as ActiveTab, label: "Ocorrências", icon: AlertCircle },
   { id: "comercios" as ActiveTab, label: "Comércios", icon: Store },
   { id: "quadras" as ActiveTab, label: "Quadras", icon: Calendar },
@@ -235,7 +239,7 @@ export default function AdminDashboard() {
 
   const handleEditSave = async () => {
     if (!editingPackage) return;
-    
+
     setSaving(true);
     try {
       const response = await api.updatePackage(String(editingPackage.id), {
@@ -246,13 +250,13 @@ export default function AdminDashboard() {
         status: editingPackage.status,
         notes: editingPackage.notes,
       });
-      
+
       // Usa a resposta do servidor para garantir dados consistentes
       const updatedPackage = response.package as PackageItem;
       setPackages((prev) =>
         prev.map((pkg) => (pkg.id === editingPackage.id ? updatedPackage : pkg))
       );
-      
+
       setEditModalOpen(false);
       setEditingPackage(null);
       toast({
@@ -278,7 +282,7 @@ export default function AdminDashboard() {
 
   const handleDeleteConfirm = async () => {
     if (!deletingPackageId) return;
-    
+
     try {
       await api.deletePackage(String(deletingPackageId));
       setPackages((prev) => prev.filter((pkg) => pkg.id !== deletingPackageId));
@@ -323,6 +327,8 @@ export default function AdminDashboard() {
         return "Cores do Site";
       case "usuarios":
         return "Gerenciar Usuários";
+      case "diario":
+        return "Diário de Obras";
       default:
         return "Dashboard";
     }
@@ -404,8 +410,8 @@ export default function AdminDashboard() {
               Voltar ao Site
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="w-full justify-start text-destructive hover:text-destructive"
             onClick={handleLogout}
           >
@@ -507,7 +513,7 @@ export default function AdminDashboard() {
 
               {/* Package List - Desktop: Table, Mobile: Cards */}
               <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                
+
                 {/* Desktop Table (hidden on mobile) */}
                 <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full">
@@ -638,7 +644,7 @@ export default function AdminDashboard() {
                       {filteredPackages.map((pkg) => {
                         const config = statusConfig[pkg.status] || statusConfig.aguardando;
                         const Icon = config.icon;
-                        
+
                         // Calculate remaining days
                         const today = new Date();
                         const deadline = new Date(pkg.pickup_deadline + 'T12:00:00');
@@ -648,27 +654,27 @@ export default function AdminDashboard() {
                         return (
                           <div key={pkg.id} className={cn(
                             "p-4 space-y-3",
-                            pkg.status === "aguardando" ? "bg-warning/5" : 
-                            pkg.status === "entregue" ? "bg-success/5" : "bg-destructive/5"
+                            pkg.status === "aguardando" ? "bg-warning/5" :
+                              pkg.status === "entregue" ? "bg-success/5" : "bg-destructive/5"
                           )}>
                             {/* Header: Icon + Name + Status */}
                             <div className="flex items-start gap-3">
                               <div className={cn(
                                 "p-2 rounded-full flex-shrink-0",
-                                pkg.status === "aguardando" ? "bg-warning/20" : 
-                                pkg.status === "entregue" ? "bg-success/20" : "bg-destructive/20"
+                                pkg.status === "aguardando" ? "bg-warning/20" :
+                                  pkg.status === "entregue" ? "bg-success/20" : "bg-destructive/20"
                               )}>
                                 <Icon className={cn(
                                   "h-5 w-5",
-                                  pkg.status === "aguardando" ? "text-warning" : 
-                                  pkg.status === "entregue" ? "text-success" : "text-destructive"
+                                  pkg.status === "aguardando" ? "text-warning" :
+                                    pkg.status === "entregue" ? "text-success" : "text-destructive"
                                 )} />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h3 className={cn(
                                   "font-semibold truncate",
-                                  pkg.status === "aguardando" ? "text-warning" : 
-                                  pkg.status === "entregue" ? "text-success" : "text-destructive"
+                                  pkg.status === "aguardando" ? "text-warning" :
+                                    pkg.status === "entregue" ? "text-success" : "text-destructive"
                                 )}>
                                   {pkg.recipient_name}
                                 </h3>
@@ -805,6 +811,9 @@ export default function AdminDashboard() {
 
           {/* Notícias Tab */}
           {activeTab === "noticias" && <AdminNewsManager />}
+
+          {/* Diário de Obras Tab */}
+          {activeTab === "diario" && <AdminDiarioManager />}
 
           {/* Ocorrências Tab */}
           {activeTab === "ocorrencias" && <AdminOccurrencesManager />}

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Home, Newspaper, AlertTriangle, Store, Phone, Calendar, Package, LogIn, TreePine, MessageCircle } from "lucide-react";
+import { Menu, X, Home, Newspaper, Eye, Store, Phone, Calendar, Package, LogIn, TreePine, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { useSettings } from "@/hooks/useSettings";
 const navItems = [
   { label: "Início", href: "/", icon: Home },
   { label: "Encomendas", href: "/encomendas", icon: Package },
-  { label: "Ocorrências", href: "/ocorrencias", icon: AlertTriangle },
+  { label: "Transparência", href: "/ocorrencias", icon: Eye },
   { label: "Notícias", href: "/noticias", icon: Newspaper },
   { label: "Quadras", href: "/quadras", icon: Calendar },
   { label: "Comércios", href: "/comercios", icon: Store },
@@ -26,9 +26,9 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 min-w-0 flex-shrink-0">
           {settings.logo_url ? (
-            <img 
-              src={settings.logo_url} 
-              alt={settings.site_name || "Vista Alegre"} 
+            <img
+              src={settings.logo_url}
+              alt={settings.site_name || "Vista Alegre"}
               className="h-9 w-9 rounded-lg object-cover flex-shrink-0"
             />
           ) : (
@@ -50,7 +50,7 @@ export function Header() {
         <nav className="hidden lg:flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.href || 
+            const isActive = location.pathname === item.href ||
               (item.href !== "/" && location.pathname.startsWith(item.href));
             return (
               <Link

@@ -19,6 +19,10 @@ export interface Atividade {
     status: 'pendente' | 'em_andamento' | 'concluido' | 'pausado' | 'cancelado';
     ordem: number;
     observacoes?: string;
+    image_url?: string;
+    video_url?: string;
+    latitude?: number;
+    longitude?: number;
     total_contestacoes?: number;
     created_at: string;
     updated_at: string;

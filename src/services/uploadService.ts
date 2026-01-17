@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export type UploadCategory = 'news' | 'site' | 'courts' | 'general' | 'businesses';
+export type UploadCategory = 'news' | 'site' | 'courts' | 'general' | 'businesses' | 'diary';
 export type FileType = 'image' | 'video';
 
 export interface UploadedFile {
@@ -82,7 +82,7 @@ class UploadService {
       });
 
       xhr.open('POST', `${this.baseUrl}/api/upload/image?category=${category}`);
-      
+
       const token = this.getAuthToken();
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -134,7 +134,7 @@ class UploadService {
       });
 
       xhr.open('POST', `${this.baseUrl}/api/upload/images?category=${category}`);
-      
+
       const token = this.getAuthToken();
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -184,7 +184,7 @@ class UploadService {
       });
 
       xhr.open('POST', `${this.baseUrl}/api/upload/video?category=${category}`);
-      
+
       const token = this.getAuthToken();
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -196,7 +196,7 @@ class UploadService {
 
   async deleteFile(filename: string, category: UploadCategory = 'general', type: FileType = 'image'): Promise<void> {
     const token = this.getAuthToken();
-    
+
     const response = await fetch(
       `${this.baseUrl}/api/upload/${filename}?category=${category}&type=${type}`,
       {
@@ -227,7 +227,7 @@ class UploadService {
     const params = new URLSearchParams();
     if (category) params.append('category', category);
     if (type) params.append('type', type);
-    
+
     const queryString = params.toString();
     const url = `${this.baseUrl}/api/upload${queryString ? `?${queryString}` : ''}`;
 
@@ -246,7 +246,7 @@ class UploadService {
 
   async getUploadLimits(): Promise<UploadLimits> {
     const response = await fetch(`${this.baseUrl}/api/upload/limits`);
-    
+
     if (!response.ok) {
       throw new Error('Erro ao obter limites de upload');
     }

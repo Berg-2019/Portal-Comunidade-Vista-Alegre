@@ -712,6 +712,8 @@ class ApiService {
     status?: string;
     observacoes?: string;
     ordem?: number;
+    image_url?: string;
+    video_url?: string;
   }) {
     return this.request<{ success: boolean; activity: any }>(`/api/diary/${diarioId}/activities`, {
       method: 'POST',
@@ -726,6 +728,8 @@ class ApiService {
     status?: string;
     observacoes?: string;
     ordem?: number;
+    image_url?: string;
+    video_url?: string;
   }) {
     return this.request<{ success: boolean; activity: any }>(`/api/diary/${diarioId}/activities/${id}`, {
       method: 'PUT',

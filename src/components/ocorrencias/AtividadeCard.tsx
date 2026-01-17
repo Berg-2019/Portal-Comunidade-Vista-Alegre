@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, MessageSquare, ChevronDown, ChevronUp, Play, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Atividade, STATUS_ATIVIDADE } from "@/types/diary";
@@ -36,6 +36,9 @@ export function AtividadeCard({ atividade, showContest = true }: AtividadeCardPr
         }
     };
 
+    const hasMedia = atividade.image_url || atividade.video_url;
+    const hasDetails = atividade.observacoes || hasMedia;
+
     return (
         <>
             <div
@@ -60,6 +63,12 @@ export function AtividadeCard({ atividade, showContest = true }: AtividadeCardPr
                                 <span className="text-xs text-muted-foreground">
                                     {atividade.tipo}
                                 </span>
+                                {hasMedia && (
+                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        {atividade.image_url && <ImageIcon className="h-3 w-3" />}
+                                        {atividade.video_url && <Play className="h-3 w-3" />}
+                                    </span>
+                                )}
                             </div>
                             <h4 className="font-medium text-sm mb-1 truncate">{atividade.descricao}</h4>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -70,7 +79,7 @@ export function AtividadeCard({ atividade, showContest = true }: AtividadeCardPr
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        {atividade.observacoes && (
+                        {hasDetails && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -98,9 +107,42 @@ export function AtividadeCard({ atividade, showContest = true }: AtividadeCardPr
                     </div>
                 </div>
 
-                {expanded && atividade.observacoes && (
-                    <div className="mt-3 pt-3 border-t">
-                        <p className="text-sm text-muted-foreground">{atividade.observacoes}</p>
+                {expanded && (
+                    <div className="mt-3 pt-3 border-t space-y-3">
+                        {/* Observações */}
+                        {atividade.observacoes && (
+                            <p className="text-sm text-muted-foreground">{atividade.observacoes}</p>
+                        )}
+
+                        {/* Media Grid */}
+                        {hasMedia && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {atividade.image_url && (
+                                    <div className="relative">
+                                        <img
+                                            src={atividade.image_url}
+                                            alt={`Foto: ${atividade.descricao}`}
+                                            className="w-full h-48 object-cover rounded-lg border"
+                                        />
+                                        <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                            📷 Foto
+                                        </span>
+                                    </div>
+                                )}
+                                {atividade.video_url && (
+                                    <div className="relative">
+                                        <video
+                                            src={atividade.video_url}
+                                            controls
+                                            className="w-full h-48 object-cover rounded-lg border"
+                                        />
+                                        <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded pointer-events-none">
+                                            🎥 Vídeo
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -122,3 +164,4 @@ export function AtividadeCard({ atividade, showContest = true }: AtividadeCardPr
         </>
     );
 }
+

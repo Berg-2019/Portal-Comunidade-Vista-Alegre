@@ -41,13 +41,17 @@ CREATE TABLE IF NOT EXISTS atividades_obra (
     status VARCHAR(50) NOT NULL DEFAULT 'em_andamento' CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'pausado', 'cancelado')),
     ordem INTEGER DEFAULT 0,
     observacoes TEXT,
+    image_url TEXT,
+    video_url TEXT,
+    latitude DECIMAL(10,8),
+    longitude DECIMAL(11,8),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_atividades_diario ON atividades_obra(diario_id);
-CREATE INDEX idx_atividades_status ON atividades_obra(status);
-CREATE INDEX idx_atividades_tipo ON atividades_obra(tipo);
+CREATE INDEX IF NOT EXISTS idx_atividades_diario ON atividades_obra(diario_id);
+CREATE INDEX IF NOT EXISTS idx_atividades_status ON atividades_obra(status);
+CREATE INDEX IF NOT EXISTS idx_atividades_tipo ON atividades_obra(tipo);
 
 -- ==================== TABLE: contestacoes_atividade ====================
 -- Public contests of activities

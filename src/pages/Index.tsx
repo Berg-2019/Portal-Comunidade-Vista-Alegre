@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { 
-  Newspaper, AlertTriangle, Store, Phone, Calendar, Package, 
-  ArrowRight, TreePine, MapPin, MessageCircle, Users 
+import {
+  Newspaper, Eye, Store, Phone, Calendar, Package,
+  ArrowRight, TreePine, MapPin, MessageCircle, Users, HardHat
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
@@ -24,9 +24,9 @@ const features = [
     color: "bg-primary/10 text-primary",
   },
   {
-    icon: AlertTriangle,
-    title: "Ocorrências",
-    description: "Acompanhe problemas do bairro e ajude a resolver.",
+    icon: Eye,
+    title: "Transparência",
+    description: "Acompanhe obras e relatos do bairro.",
     href: "/ocorrencias",
     color: "bg-warning/10 text-warning",
   },
@@ -121,14 +121,14 @@ export default function Index() {
       <section className="relative min-h-[70vh] flex items-center overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <img 
-            src={settings.cover_image || vistaAereaCidade} 
-            alt="Vista aérea de Vista Alegre do Abunã" 
+          <img
+            src={settings.cover_image || vistaAereaCidade}
+            alt="Vista aérea de Vista Alegre do Abunã"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-primary/70 to-primary/90" />
         </div>
-        
+
         <div className="container relative py-16 md:py-24 z-10">
           <div className="max-w-3xl mx-auto text-center text-primary-foreground">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm text-sm mb-6 animate-fade-up border border-primary-foreground/20">
@@ -141,7 +141,7 @@ export default function Index() {
               <span className="text-primary-foreground/95">{settings.hero_subtitle || "Vista Alegre"}</span>
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/90 mb-8 animate-fade-up drop-shadow" style={{ animationDelay: "0.2s" }}>
-              Conectando moradores, fortalecendo nossa comunidade. 
+              Conectando moradores, fortalecendo nossa comunidade.
               Notícias, serviços e informações em um só lugar.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up flex-wrap" style={{ animationDelay: "0.3s" }}>
@@ -152,7 +152,7 @@ export default function Index() {
                 </Button>
               </Link>
               {getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.') ? (
-                <a 
+                <a
                   href={getWhatsAppLink('Olá! Gostaria de agendar uma quadra esportiva.')}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -172,8 +172,8 @@ export default function Index() {
               )}
               <Link to="/ocorrencias">
                 <Button size="lg" className="w-full sm:w-auto bg-warning text-warning-foreground hover:bg-warning/90 shadow-lg">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  Reportar Problema
+                  <Eye className="h-5 w-5 mr-2" />
+                  Portal Transparência
                 </Button>
               </Link>
             </div>
@@ -195,14 +195,14 @@ export default function Index() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Quadras Esportivas Card */}
-          <Link 
-            to="/quadras" 
+          <Link
+            to="/quadras"
             className="group relative rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover-lift"
           >
             <div className="aspect-[16/10] overflow-hidden">
-              <img 
-                src={quadrasEsportivas} 
-                alt="Quadras esportivas de Vista Alegre" 
+              <img
+                src={quadrasEsportivas}
+                alt="Quadras esportivas de Vista Alegre"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
@@ -220,14 +220,14 @@ export default function Index() {
           </Link>
 
           {/* Praça da Comunidade Card */}
-          <Link 
-            to="/sobre" 
+          <Link
+            to="/sobre"
             className="group relative rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover-lift"
           >
             <div className="aspect-[16/10] overflow-hidden">
-              <img 
-                src={pracaComunidade} 
-                alt="Praça da comunidade Vista Alegre" 
+              <img
+                src={pracaComunidade}
+                alt="Praça da comunidade Vista Alegre"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
@@ -358,10 +358,10 @@ export default function Index() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
             <h2 className="font-heading text-2xl md:text-3xl font-bold mb-2">
-              Ocorrências Recentes
+              Portal da Transparência
             </h2>
             <p className="text-muted-foreground">
-              Acompanhe os problemas reportados na comunidade
+              Obras em andamento e relatos da comunidade
             </p>
           </div>
           <Link to="/ocorrencias" className="mt-4 md:mt-0">
@@ -415,7 +415,7 @@ export default function Index() {
           </div>
         ) : (
           <div className="text-center py-12 bg-card rounded-xl">
-            <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <HardHat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhuma ocorrência registrada.</p>
           </div>
         )}
@@ -432,7 +432,7 @@ export default function Index() {
             Participe da Comunidade
           </h2>
           <p className="text-primary-foreground/85 mb-6 max-w-xl mx-auto">
-            Entre no grupo do WhatsApp da comunidade para receber atualizações, 
+            Entre no grupo do WhatsApp da comunidade para receber atualizações,
             participar de discussões e ajudar a melhorar nosso bairro.
           </p>
           <Link to="/comunidade">

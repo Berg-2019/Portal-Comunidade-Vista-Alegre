@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     Calendar, Filter, Loader2, ChevronDown, ChevronRight,
-    Sun, Cloud, CloudRain, CloudLightning, CloudSun, HardHat
+    Sun, Cloud, CloudRain, CloudLightning, CloudSun, HardHat, Map
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/services/api";
-import { Diario, TipoAtividade, CONDICOES_TEMPO } from "@/types/diary";
+import { Diario, Atividade, TipoAtividade, CONDICOES_TEMPO } from "@/types/diary";
 import { AtividadeCard } from "./AtividadeCard";
+import { ObrasMap } from "@/components/mapa";
 import { cn } from "@/lib/utils";
 
 const weatherIcons: Record<string, React.ElementType> = {
@@ -26,6 +28,8 @@ export function DiarioObrasTab() {
     const [expandedDiario, setExpandedDiario] = useState<number | null>(null);
     const [diarioDetails, setDiarioDetails] = useState<Record<number, Diario>>({});
     const [loadingDetails, setLoadingDetails] = useState<number | null>(null);
+    const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
+    const [viewMode, setViewMode] = useState<"mapa" | "lista">("mapa");
 
     // Filter state
     const [dataInicio, setDataInicio] = useState("");
@@ -45,12 +49,30 @@ export function DiarioObrasTab() {
             ]);
             setDiarios(diariosData);
             setTipos(tiposData);
+
+            // Carregar detalhes de todos os diários para o mapa
+            const detailsPromises = diariosData.slice(0, 10).map(d => api.getDiario(d.id));
+            const detailsResults = await Promise.all(detailsPromises);
+            const detailsMap: Record<number, Diario> = {};
+            detailsResults.forEach(d => { detailsMap[d.id] = d; });
+            setDiarioDetails(detailsMap);
         } catch (error) {
             console.error("Error loading diarios:", error);
         } finally {
             setLoading(false);
         }
     };
+
+    // Coletar todas as atividades para o mapa
+    const todasAtividades = useMemo(() => {
+        const atividades: Atividade[] = [];
+        Object.values(diarioDetails).forEach(diario => {
+            if (diario.atividades) {
+                atividades.push(...diario.atividades);
+            }
+        });
+        return atividades;
+    }, [diarioDetails]);
 
     const loadDiarioDetails = async (diarioId: number) => {
         if (diarioDetails[diarioId]) {
@@ -98,6 +120,10 @@ export function DiarioObrasTab() {
             month: "long",
             year: "numeric",
         });
+    };
+
+    const handleSelectAtividade = (atividade: Atividade) => {
+        setSelectedAtividade(atividade);
     };
 
     return (
@@ -180,106 +206,161 @@ export function DiarioObrasTab() {
                     <p className="text-muted-foreground">Nenhum diário de obras encontrado.</p>
                 </div>
             ) : (
-                <div className="space-y-3">
-                    {diarios.map((diario) => {
-                        const isExpanded = expandedDiario === diario.id;
-                        const details = diarioDetails[diario.id];
-                        const isLoading = loadingDetails === diario.id;
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "mapa" | "lista")}>
+                    <TabsList className="mb-4">
+                        <TabsTrigger value="mapa" className="gap-2">
+                            <Map className="h-4 w-4" />
+                            Mapa
+                        </TabsTrigger>
+                        <TabsTrigger value="lista" className="gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Lista
+                        </TabsTrigger>
+                    </TabsList>
 
-                        return (
-                            <Collapsible
-                                key={diario.id}
-                                open={isExpanded}
-                                onOpenChange={() => loadDiarioDetails(diario.id)}
-                            >
-                                <div className="bg-card rounded-xl shadow-card overflow-hidden">
-                                    <CollapsibleTrigger asChild>
-                                        <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="h-5 w-5 text-primary" />
-                                                    <span className="font-semibold capitalize">
-                                                        {formatDate(diario.data)}
-                                                    </span>
-                                                </div>
+                    {/* Visualização em Mapa */}
+                    <TabsContent value="mapa" className="mt-0">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            {/* Mapa */}
+                            <div className="lg:col-span-2">
+                                <ObrasMap
+                                    atividades={todasAtividades}
+                                    selectedAtividadeId={selectedAtividade?.id}
+                                    onSelectAtividade={handleSelectAtividade}
+                                    className="h-[500px] rounded-xl border shadow-sm"
+                                />
+                            </div>
 
-                                                {diario.tempo && diario.tempo.length > 0 && (
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                        {getWeatherIcon(diario.tempo[0].condicao)}
-                                                        <span>{getWeatherLabel(diario.tempo[0].condicao)}</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                            {/* Lista lateral */}
+                            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                                <h3 className="font-semibold text-sm text-muted-foreground sticky top-0 bg-background py-2">
+                                    Atividades Recentes ({todasAtividades.length})
+                                </h3>
+                                {todasAtividades.slice(0, 20).map((atividade) => (
+                                    <div
+                                        key={atividade.id}
+                                        className={cn(
+                                            "cursor-pointer transition-all",
+                                            selectedAtividade?.id === atividade.id && "ring-2 ring-primary rounded-lg"
+                                        )}
+                                        onClick={() => handleSelectAtividade(atividade)}
+                                    >
+                                        <AtividadeCard atividade={atividade} showContest={false} />
+                                    </div>
+                                ))}
+                                {todasAtividades.length === 0 && (
+                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                        Nenhuma atividade encontrada.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </TabsContent>
 
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-sm text-muted-foreground">
-                                                    {diario.total_atividades || 0} atividade(s)
-                                                </span>
-                                                {isLoading ? (
-                                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                                ) : isExpanded ? (
-                                                    <ChevronDown className="h-5 w-5" />
-                                                ) : (
-                                                    <ChevronRight className="h-5 w-5" />
-                                                )}
-                                            </div>
-                                        </button>
-                                    </CollapsibleTrigger>
+                    {/* Visualização em Lista */}
+                    <TabsContent value="lista" className="mt-0">
+                        <div className="space-y-3">
+                            {diarios.map((diario) => {
+                                const isExpanded = expandedDiario === diario.id;
+                                const details = diarioDetails[diario.id];
+                                const isLoading = loadingDetails === diario.id;
 
-                                    <CollapsibleContent>
-                                        <div className="border-t p-4 space-y-4 bg-muted/30">
-                                            {/* Weather info */}
-                                            {details?.tempo && details.tempo.length > 0 && (
-                                                <div className="flex flex-wrap gap-3 pb-3 border-b">
-                                                    {details.tempo.map((t) => (
-                                                        <div
-                                                            key={t.id}
-                                                            className={cn(
-                                                                "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs",
-                                                                "bg-background border"
-                                                            )}
-                                                        >
-                                                            {getWeatherIcon(t.condicao)}
-                                                            <span className="capitalize">{t.periodo}</span>:
-                                                            <span>{getWeatherLabel(t.condicao)}</span>
-                                                            {t.temperatura_min && t.temperatura_max && (
-                                                                <span className="text-muted-foreground">
-                                                                    ({t.temperatura_min}° - {t.temperatura_max}°)
-                                                                </span>
-                                                            )}
+                                return (
+                                    <Collapsible
+                                        key={diario.id}
+                                        open={isExpanded}
+                                        onOpenChange={() => loadDiarioDetails(diario.id)}
+                                    >
+                                        <div className="bg-card rounded-xl shadow-card overflow-hidden">
+                                            <CollapsibleTrigger asChild>
+                                                <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar className="h-5 w-5 text-primary" />
+                                                            <span className="font-semibold capitalize">
+                                                                {formatDate(diario.data)}
+                                                            </span>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            )}
 
-                                            {/* Activities */}
-                                            {details?.atividades && details.atividades.length > 0 ? (
-                                                <div className="space-y-3">
-                                                    {details.atividades.map((atividade) => (
-                                                        <AtividadeCard key={atividade.id} atividade={atividade} />
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground text-center py-4">
-                                                    Nenhuma atividade registrada para este dia.
-                                                </p>
-                                            )}
+                                                        {diario.tempo && diario.tempo.length > 0 && (
+                                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                                {getWeatherIcon(diario.tempo[0].condicao)}
+                                                                <span>{getWeatherLabel(diario.tempo[0].condicao)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
-                                            {/* Observations */}
-                                            {details?.observacoes && (
-                                                <div className="pt-3 border-t">
-                                                    <p className="text-sm text-muted-foreground">
-                                                        <span className="font-medium">Observações:</span> {details.observacoes}
-                                                    </p>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm text-muted-foreground">
+                                                            {diario.total_atividades || 0} atividade(s)
+                                                        </span>
+                                                        {isLoading ? (
+                                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                                        ) : isExpanded ? (
+                                                            <ChevronDown className="h-5 w-5" />
+                                                        ) : (
+                                                            <ChevronRight className="h-5 w-5" />
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </CollapsibleTrigger>
+
+                                            <CollapsibleContent>
+                                                <div className="border-t p-4 space-y-4 bg-muted/30">
+                                                    {/* Weather info */}
+                                                    {details?.tempo && details.tempo.length > 0 && (
+                                                        <div className="flex flex-wrap gap-3 pb-3 border-b">
+                                                            {details.tempo.map((t) => (
+                                                                <div
+                                                                    key={t.id}
+                                                                    className={cn(
+                                                                        "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs",
+                                                                        "bg-background border"
+                                                                    )}
+                                                                >
+                                                                    {getWeatherIcon(t.condicao)}
+                                                                    <span className="capitalize">{t.periodo}</span>:
+                                                                    <span>{getWeatherLabel(t.condicao)}</span>
+                                                                    {t.temperatura_min && t.temperatura_max && (
+                                                                        <span className="text-muted-foreground">
+                                                                            ({t.temperatura_min}° - {t.temperatura_max}°)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Activities */}
+                                                    {details?.atividades && details.atividades.length > 0 ? (
+                                                        <div className="space-y-3">
+                                                            {details.atividades.map((atividade) => (
+                                                                <AtividadeCard key={atividade.id} atividade={atividade} />
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                                            Nenhuma atividade registrada para este dia.
+                                                        </p>
+                                                    )}
+
+                                                    {/* Observations */}
+                                                    {details?.observacoes && (
+                                                        <div className="pt-3 border-t">
+                                                            <p className="text-sm text-muted-foreground">
+                                                                <span className="font-medium">Observações:</span> {details.observacoes}
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
+                                            </CollapsibleContent>
                                         </div>
-                                    </CollapsibleContent>
-                                </div>
-                            </Collapsible>
-                        );
-                    })}
-                </div>
+                                    </Collapsible>
+                                );
+                            })}
+                        </div>
+                    </TabsContent>
+                </Tabs>
             )}
         </div>
     );

@@ -39,6 +39,7 @@ import { api } from "@/services/api";
 import { Diario, Atividade, TipoAtividade, Contestacao, STATUS_ATIVIDADE, CONDICOES_TEMPO } from "@/types/diary";
 import ImageUpload from "./ImageUpload";
 import VideoUpload from "./VideoUpload";
+import { useGeocoding } from "@/hooks/useGeocoding";
 
 const weatherIcons: Record<string, React.ElementType> = {
     ensolarado: Sun,
@@ -141,8 +142,31 @@ export default function AdminDiarioManager() {
             status: 'pendente',
             image_url: '',
             video_url: '',
+            latitude: undefined,
+            longitude: undefined,
         });
         setAtividadeModalOpen(true);
+    };
+
+    // Geocoding hook
+    const { geocode, loading: geocodingLoading } = useGeocoding();
+
+    const handleGeocode = async () => {
+        if (!editingAtividade?.local) {
+            toast({ title: "Erro", description: "Preencha o campo 'Local' primeiro.", variant: "destructive" });
+            return;
+        }
+        const result = await geocode(editingAtividade.local);
+        if (result) {
+            setEditingAtividade({
+                ...editingAtividade,
+                latitude: result.latitude,
+                longitude: result.longitude
+            });
+            toast({ title: "Sucesso", description: `Localização encontrada: ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}` });
+        } else {
+            toast({ title: "Erro", description: "Não foi possível encontrar a localização.", variant: "destructive" });
+        }
     };
 
     const handleSaveAtividade = async () => {
@@ -159,6 +183,8 @@ export default function AdminDiarioManager() {
                     observacoes: editingAtividade.observacoes,
                     image_url: editingAtividade.image_url || undefined,
                     video_url: editingAtividade.video_url || undefined,
+                    latitude: editingAtividade.latitude,
+                    longitude: editingAtividade.longitude,
                 });
                 toast({ title: "Sucesso", description: "Atividade atualizada." });
             } else {
@@ -170,6 +196,8 @@ export default function AdminDiarioManager() {
                     observacoes: editingAtividade.observacoes,
                     image_url: editingAtividade.image_url || undefined,
                     video_url: editingAtividade.video_url || undefined,
+                    latitude: editingAtividade.latitude,
+                    longitude: editingAtividade.longitude,
                 });
                 toast({ title: "Sucesso", description: "Atividade criada." });
             }
@@ -506,6 +534,42 @@ export default function AdminDiarioManager() {
                                     value={editingAtividade?.video_url || ''}
                                     onChange={(url) => setEditingAtividade({ ...editingAtividade, video_url: url })}
                                 />
+                            </div>
+                        </div>
+                        {/* Campos de Coordenadas */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-muted/30 rounded-lg border">
+                            <div>
+                                <Label className="text-xs">Latitude</Label>
+                                <Input
+                                    type="number"
+                                    step="any"
+                                    value={editingAtividade?.latitude || ''}
+                                    onChange={(e) => setEditingAtividade({ ...editingAtividade, latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                    placeholder="-9.6050"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Longitude</Label>
+                                <Input
+                                    type="number"
+                                    step="any"
+                                    value={editingAtividade?.longitude || ''}
+                                    onChange={(e) => setEditingAtividade({ ...editingAtividade, longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                    placeholder="-65.3600"
+                                />
+                            </div>
+                            <div className="flex items-end">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleGeocode}
+                                    disabled={geocodingLoading || !editingAtividade?.local}
+                                    className="w-full"
+                                >
+                                    {geocodingLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MapPin className="h-4 w-4 mr-1" />}
+                                    Buscar Localização
+                                </Button>
                             </div>
                         </div>
                     </div>
